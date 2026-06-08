@@ -1,0 +1,7 @@
+package m
+script Guard {
+	if var(VAR_X) == 3 {
+		end()
+	}
+	end()
+}

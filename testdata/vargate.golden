@@ -1,0 +1,12 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef Guard
+	scrdef_end
+Guard:
+	compare_var_to_value VAR_X, 3
+	goto_if_ne _L0
+	end
+_L0:
+	end

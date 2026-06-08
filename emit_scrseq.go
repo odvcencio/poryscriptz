@@ -47,7 +47,12 @@ func Emit(prog *Program, tgt target.GameTarget) string {
 			}
 		}
 		// Instruction body.
-		macro := tgt.MacroName(ins.Opcode)
+		// Macro takes precedence: control-flow wrapper macros (e.g. goto_if_unset)
+		// are not base opcodes in scrcmd.json and are emitted as literal names.
+		macro := ins.Macro
+		if macro == "" {
+			macro = tgt.MacroName(ins.Opcode)
+		}
 		b.WriteByte('\t')
 		b.WriteString(macro)
 		if len(ins.Args) > 0 {

@@ -1,0 +1,8 @@
+package m
+script Joey {
+	if flag(FLAG_X) {
+		end()
+	}
+	setflag(FLAG_X)
+	end()
+}

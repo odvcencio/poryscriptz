@@ -1,0 +1,12 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef Joey
+	scrdef_end
+Joey:
+	goto_if_unset FLAG_X, _L0
+	end
+_L0:
+	setflag FLAG_X
+	end
