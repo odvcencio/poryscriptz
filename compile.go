@@ -2,13 +2,17 @@ package poryscriptz
 
 import "m31labs.dev/poryscriptz/target"
 
-// Compile (Task 4: parse + resolve only). Task 5 extends this to lower + emit.
+// Compile parses, resolves, lowers, and emits src for the given target.
+// Returns the assembled text, any diagnostics (on parse/resolve error), and a
+// hard parse error if the source is structurally unparseable.
 func Compile(src []byte, tgt target.GameTarget) (string, []Diag, error) {
 	root, w, err := Parse(src)
 	if err != nil {
 		return "", nil, err
 	}
 	prog, diags := Resolve(w, root, tgt)
-	_ = prog
-	return "", diags, nil // TODO(Task 5): if no diags, Lower(prog) then Emit(...)
+	if len(diags) != 0 {
+		return "", diags, nil
+	}
+	return Emit(prog, tgt), nil, nil
 }

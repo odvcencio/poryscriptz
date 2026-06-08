@@ -34,3 +34,14 @@ func TestResolveKnownCommandOK(t *testing.T) {
 		t.Fatalf("want no diags, got %v", diags)
 	}
 }
+
+func TestResolveArityMismatch(t *testing.T) {
+	src := []byte("package m\n\nscript S {\n\tsetflag()\n}\n")
+	_, diags, err := Compile(src, hgssT(t))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	if len(diags) == 0 || !strings.Contains(diags[0].Msg, "expects") {
+		t.Fatalf("want arity-mismatch diagnostic, got %v", diags)
+	}
+}
