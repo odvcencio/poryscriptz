@@ -1,0 +1,8 @@
+package m
+script YoungsterJoey {
+	if flag(FLAG_DAILY) {
+		end()
+	}
+	setflag(FLAG_DAILY)
+	end()
+}

@@ -223,7 +223,7 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 		diags = append(diags, Diag{
 			Line: line,
 			Col:  col,
-			Msg:  fmt.Sprintf("command %q not in HGSS vocabulary", name),
+			Msg:  fmt.Sprintf("command %q not in %s vocabulary", name, tgt.Name()),
 		})
 		return nil, diags
 	}

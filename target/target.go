@@ -3,6 +3,7 @@ package target
 import "m31labs.dev/poryscriptz/vocab"
 
 type GameTarget interface {
+	Name() string // human-readable target name, e.g. "HGSS"
 	Vocabulary() *vocab.Table
 	MacroName(opcode int) string // script.inc macro name, or "scrcmd_NNN"
 	// Preamble emits the file header every real scr_seq/*.s begins with: the

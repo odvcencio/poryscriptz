@@ -17,6 +17,7 @@ func HGSS(scrcmdJSONPath string) (GameTarget, error) {
 	return &hgss{tbl: tbl}, nil
 }
 
+func (h *hgss) Name() string             { return "HGSS" }
 func (h *hgss) Vocabulary() *vocab.Table { return h.tbl }
 
 func (h *hgss) MacroName(opcode int) string {
