@@ -37,12 +37,16 @@ func (Call) isStmt() {}
 
 // If is a resolved if-statement with a flag or var-equality condition.
 // Kind is "flag" or "vareq"; the corresponding fields (Flag / Var+Value) are set.
+// Else holds the resolved else-branch statements (nil when there is no else).
+// For an "else if" chain, Else contains a single If stmt; for a plain "else { … }"
+// it contains the block's resolved statements.
 type If struct {
 	Kind  string // "flag" or "vareq"
 	Flag  string // Kind=="flag": identifier text, e.g. "FLAG_X"
 	Var   string // Kind=="vareq": var identifier text, e.g. "VAR_X"
 	Value string // Kind=="vareq": literal text, e.g. "3"
 	Body  []Stmt
+	Else  []Stmt // nil when there is no else branch
 }
 
 func (If) isStmt() {}
@@ -197,14 +201,6 @@ func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt
 		return nil, diags
 	}
 
-	// Reject else clauses — silently dropping them would be a correctness hazard.
-	// else/elif support is a documented next-iteration item.
-	if altNode := w.Field(ifNode, "alternative"); altNode != nil {
-		altLine, altCol := w.Pos(altNode)
-		diags = append(diags, Diag{Line: altLine, Col: altCol, Msg: "else clause not supported in poryscriptZ v0.1"})
-		return nil, diags
-	}
-
 	// Resolve the consequence block's statement list.
 	if conseqNode != nil {
 		bodyStmtList := w.ChildByType(conseqNode, "statement_list")
@@ -212,6 +208,31 @@ func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt
 			bodyStmts, ds := resolveStmtList(w, bodyStmtList, tgt)
 			diags = append(diags, ds...)
 			result.Body = bodyStmts
+		}
+	}
+
+	// Resolve the alternative (else / else-if), if present.
+	if altNode := w.Field(ifNode, "alternative"); altNode != nil {
+		switch w.Type(altNode) {
+		case "block":
+			// Plain else { … }
+			elseStmtList := w.ChildByType(altNode, "statement_list")
+			if elseStmtList != nil {
+				elseStmts, ds := resolveStmtList(w, elseStmtList, tgt)
+				diags = append(diags, ds...)
+				result.Else = elseStmts
+			}
+		case "if_statement":
+			// else if … — resolve recursively and wrap as a single If stmt.
+			elseIf, ds := resolveIf(w, altNode, tgt)
+			diags = append(diags, ds...)
+			if elseIf != nil {
+				result.Else = []Stmt{elseIf}
+			}
+		default:
+			altLine, altCol := w.Pos(altNode)
+			diags = append(diags, Diag{Line: altLine, Col: altCol, Msg: fmt.Sprintf("unexpected else alternative node type: %s", w.Type(altNode))})
+			return nil, diags
 		}
 	}
 

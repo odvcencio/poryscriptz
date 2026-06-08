@@ -46,13 +46,13 @@ func TestResolveArityMismatch(t *testing.T) {
 	}
 }
 
-func TestResolveElseRejected(t *testing.T) {
+func TestResolveElseAccepted(t *testing.T) {
 	src := []byte("package m\nscript S {\n\tif flag(FLAG_X) {\n\t\tend()\n\t} else {\n\t\tend()\n\t}\n}\n")
 	_, diags, err := Compile(src, hgssT(t))
 	if err != nil {
 		t.Fatalf("compile: %v", err)
 	}
-	if len(diags) == 0 || !strings.Contains(diags[0].Msg, "else") {
-		t.Fatalf("want else-rejected diagnostic, got %v", diags)
+	if len(diags) != 0 {
+		t.Fatalf("want no diags for else clause, got %v", diags)
 	}
 }

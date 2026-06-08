@@ -54,24 +54,58 @@ func (c *lowerCtx) lowerStmts(stmts []Stmt) {
 
 // lowerIf lowers an If statement into a branch + body + label-sentinel pattern.
 //
-// flag:  goto_if_unset FLAG, _Lx  ; <body> ; _Lx:
-// vareq: compare_var_to_value VAR, N ; goto_if_ne _Lx ; <body> ; _Lx:
+// Without else (v0.1 behaviour, unchanged):
+//
+//	flag:  goto_if_unset FLAG, _Lx  ; <body> ; _Lx:
+//	vareq: compare_var_to_value VAR, N ; goto_if_ne _Lx ; <body> ; _Lx:
+//
+// With else:
+//
+//	flag:  goto_if_unset FLAG, _Lelse ; <then> ; goto _Lend ; _Lelse: ; <else> ; _Lend:
+//	vareq: compare_var_to_value VAR,N ; goto_if_ne _Lelse ; <then> ; goto _Lend ; _Lelse: ; <else> ; _Lend:
+//
+// Each call allocates fresh labels from the file-monotonic counter so that
+// nested and sibling constructs never produce duplicate label names.
 //
 // The wrapper macro names (goto_if_unset, goto_if_ne, compare_var_to_value) are
 // HGSS-specific and emitted as literal Macro strings.
 // TODO(task-N): route through GameTarget when a second game target is added.
 func (c *lowerCtx) lowerIf(st If) {
-	label := c.nextLabel()
+	if len(st.Else) == 0 {
+		// No else — v0.1 single-skip-label behaviour.
+		skipLabel := c.nextLabel()
+		switch st.Kind {
+		case "flag":
+			c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, skipLabel}})
+		case "vareq":
+			c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
+			c.append(Instr{Macro: "goto_if_ne", Args: []string{skipLabel}})
+		}
+		c.lowerStmts(st.Body)
+		c.append(Instr{Label: skipLabel, Opcode: -1})
+		return
+	}
+
+	// Has else — allocate _Lelse (jump target when condition is false) and
+	// _Lend (jump target after the then-body to skip the else-body).
+	lelse := c.nextLabel()
+	lend := c.nextLabel()
+
 	switch st.Kind {
 	case "flag":
-		c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, label}})
+		c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, lelse}})
 	case "vareq":
 		c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
-		c.append(Instr{Macro: "goto_if_ne", Args: []string{label}})
+		c.append(Instr{Macro: "goto_if_ne", Args: []string{lelse}})
 	}
 	c.lowerStmts(st.Body)
-	// Branch target sentinel (label only, no macro body).
-	c.append(Instr{Label: label, Opcode: -1})
+	// Unconditional jump past the else-body.
+	c.append(Instr{Macro: "goto", Args: []string{lend}})
+	// Else label sentinel + else body.
+	c.append(Instr{Label: lelse, Opcode: -1})
+	c.lowerStmts(st.Else)
+	// End label sentinel.
+	c.append(Instr{Label: lend, Opcode: -1})
 }
 
 // Lower converts a resolved Program into a flat Instr slice.
