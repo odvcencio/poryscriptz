@@ -48,6 +48,10 @@ func (c *lowerCtx) lowerStmts(stmts []Stmt) {
 			})
 		case If:
 			c.lowerIf(st)
+		case While:
+			c.lowerWhile(st)
+		case Switch:
+			c.lowerSwitch(st)
 		}
 	}
 }
@@ -105,6 +109,106 @@ func (c *lowerCtx) lowerIf(st If) {
 	c.append(Instr{Label: lelse, Opcode: -1})
 	c.lowerStmts(st.Else)
 	// End label sentinel.
+	c.append(Instr{Label: lend, Opcode: -1})
+}
+
+// lowerWhile lowers a While statement into a top-test loop:
+//
+//	_Ltop:
+//	  <¬cond jump → _Lend>
+//	  <body>
+//	  goto _Ltop
+//	_Lend:
+//
+// The condition is negated in the same way as lowerIf's no-else path:
+//
+//	flag:  goto_if_unset FLAG, _Lend
+//	vareq: compare_var_to_value VAR, N ; goto_if_ne _Lend
+func (c *lowerCtx) lowerWhile(st While) {
+	ltop := c.nextLabel()
+	lend := c.nextLabel()
+
+	// Top-of-loop label sentinel.
+	c.append(Instr{Label: ltop, Opcode: -1})
+
+	// Negated condition jump to lend.
+	switch st.Kind {
+	case "flag":
+		c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, lend}})
+	case "vareq":
+		c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
+		c.append(Instr{Macro: "goto_if_ne", Args: []string{lend}})
+	}
+
+	// Loop body.
+	c.lowerStmts(st.Body)
+
+	// Back-edge jump.
+	c.append(Instr{Macro: "goto", Args: []string{ltop}})
+
+	// End-of-loop label sentinel.
+	c.append(Instr{Label: lend, Opcode: -1})
+}
+
+// lowerSwitch lowers a Switch statement into a compare-chain dispatch:
+//
+//	compare_var_to_value VAR, case0.Val
+//	goto_if_eq _L<case0>
+//	compare_var_to_value VAR, case1.Val
+//	goto_if_eq _L<case1>
+//	…
+//	goto _Ldefault        (or goto _Lend if no default)
+//	_L<case0>:
+//	  <body0>
+//	  goto _Lend
+//	_L<case1>:
+//	  <body1>
+//	  goto _Lend
+//	…
+//	_Ldefault:
+//	  <default body>
+//	_Lend:
+//
+// Arms do NOT fall through; each arm ends with an unconditional goto _Lend.
+// The default arm (if present) falls through naturally into _Lend.
+func (c *lowerCtx) lowerSwitch(st Switch) {
+	// Allocate one label per case arm, one for default, one for end.
+	caseLabels := make([]string, len(st.Cases))
+	for i := range st.Cases {
+		caseLabels[i] = c.nextLabel()
+	}
+	var ldefault string
+	if len(st.Default) > 0 {
+		ldefault = c.nextLabel()
+	}
+	lend := c.nextLabel()
+
+	// Emit compare-chain.
+	for i, sc := range st.Cases {
+		c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, sc.Val}})
+		c.append(Instr{Macro: "goto_if_eq", Args: []string{caseLabels[i]}})
+	}
+	// Unconditional jump to default or end.
+	if ldefault != "" {
+		c.append(Instr{Macro: "goto", Args: []string{ldefault}})
+	} else {
+		c.append(Instr{Macro: "goto", Args: []string{lend}})
+	}
+
+	// Emit case arm bodies.
+	for i, sc := range st.Cases {
+		c.append(Instr{Label: caseLabels[i], Opcode: -1})
+		c.lowerStmts(sc.Body)
+		c.append(Instr{Macro: "goto", Args: []string{lend}})
+	}
+
+	// Emit default body (falls through to lend).
+	if ldefault != "" {
+		c.append(Instr{Label: ldefault, Opcode: -1})
+		c.lowerStmts(st.Default)
+	}
+
+	// End-of-switch label sentinel.
 	c.append(Instr{Label: lend, Opcode: -1})
 }
 

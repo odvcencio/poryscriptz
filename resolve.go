@@ -49,7 +49,32 @@ type If struct {
 	Else  []Stmt // nil when there is no else branch
 }
 
-func (If) isStmt() {}
+func (If) isStmt()     {}
+func (While) isStmt()  {}
+func (Switch) isStmt() {}
+
+// While is a resolved while-loop (written as `for cond { … }` in source).
+// Kind/Flag/Var/Value have the same semantics as in If.
+type While struct {
+	Kind  string // "flag" or "vareq"
+	Flag  string // Kind=="flag"
+	Var   string // Kind=="vareq"
+	Value string // Kind=="vareq"
+	Body  []Stmt
+}
+
+// SwitchCase is a single `case <int_literal>:` arm of a Switch statement.
+type SwitchCase struct {
+	Val  string // int literal text, e.g. "1"
+	Body []Stmt
+}
+
+// Switch is a resolved switch statement whose subject is var(<IDENT>).
+type Switch struct {
+	Var     string       // variable identifier, e.g. "VAR_X"
+	Cases   []SwitchCase // case arms in source order
+	Default []Stmt       // default: body (nil if absent)
+}
 
 // Resolve walks each script_declaration in the CST, type-checks command calls
 // against the target vocabulary, and returns the Program plus collected
@@ -123,6 +148,18 @@ func resolveStmtList(w *taproot.Walker, stmtList *gts.Node, tgt target.GameTarge
 			}
 		case "if_statement":
 			stmt, ds := resolveIf(w, child, tgt)
+			diags = append(diags, ds...)
+			if stmt != nil {
+				stmts = append(stmts, stmt)
+			}
+		case "for_statement":
+			stmt, ds := resolveWhile(w, child, tgt)
+			diags = append(diags, ds...)
+			if stmt != nil {
+				stmts = append(stmts, stmt)
+			}
+		case "expression_switch_statement":
+			stmt, ds := resolveSwitch(w, child, tgt)
 			diags = append(diags, ds...)
 			if stmt != nil {
 				stmts = append(stmts, stmt)
@@ -233,6 +270,176 @@ func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt
 			altLine, altCol := w.Pos(altNode)
 			diags = append(diags, Diag{Line: altLine, Col: altCol, Msg: fmt.Sprintf("unexpected else alternative node type: %s", w.Type(altNode))})
 			return nil, diags
+		}
+	}
+
+	return result, diags
+}
+
+// resolveWhile resolves a for_statement node that acts as a while loop.
+//
+// Only the simple-condition forms are accepted:
+//
+//	for flag(FLAG_X) { … }          → While{Kind:"flag", Flag:"FLAG_X", …}
+//	for var(VAR_X) == N { … }       → While{Kind:"vareq", Var:"VAR_X", Value:"N", …}
+//
+// Three-clause for loops, range loops, and bare `for {}` (no condition) are
+// rejected with a clear diagnostic.
+func resolveWhile(w *taproot.Walker, forNode *gts.Node, tgt target.GameTarget) (Stmt, []Diag) {
+	var diags []Diag
+
+	// for_statement has two named children: condition (index 0) and block (index 1).
+	// A bare `for {}` (infinite loop) has only one named child (the block); reject it.
+	// A three-clause `for i := 0; i < n; i++ {}` has a for_clause named child; reject.
+	if forNode.NamedChildCount() != 2 {
+		line, col := w.Pos(forNode)
+		diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-loop: only while-style `for cond {}` is allowed (no bare for, 3-clause, or range)"})
+		return nil, diags
+	}
+
+	condNode := forNode.NamedChild(0)
+	bodyBlock := forNode.NamedChild(1)
+	line, col := w.Pos(condNode)
+
+	var result While
+
+	switch w.Type(condNode) {
+	case "call_expression":
+		funcNode := w.Field(condNode, "function")
+		if w.Text(funcNode) != "flag" {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: only flag() and var()==N supported"})
+			return nil, diags
+		}
+		argList := w.Field(condNode, "arguments")
+		if argList == nil || argList.NamedChildCount() != 1 {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: flag() requires exactly one argument"})
+			return nil, diags
+		}
+		flagIdent := argList.NamedChild(0)
+		result = While{Kind: "flag", Flag: w.Text(flagIdent)}
+
+	case "binary_expression":
+		leftNode := w.Field(condNode, "left")
+		rightNode := w.Field(condNode, "right")
+		opNode := w.Field(condNode, "operator")
+		if w.Text(opNode) != "==" {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: only == operator supported"})
+			return nil, diags
+		}
+		if w.Type(leftNode) != "call_expression" {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: left side must be var()"})
+			return nil, diags
+		}
+		funcNode := w.Field(leftNode, "function")
+		if w.Text(funcNode) != "var" {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: left call must be var()"})
+			return nil, diags
+		}
+		argList := w.Field(leftNode, "arguments")
+		if argList == nil || argList.NamedChildCount() != 1 {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: var() requires exactly one argument"})
+			return nil, diags
+		}
+		varIdent := argList.NamedChild(0)
+		if w.Type(rightNode) != "int_literal" {
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported for-condition: right side must be int literal"})
+			return nil, diags
+		}
+		result = While{Kind: "vareq", Var: w.Text(varIdent), Value: w.Text(rightNode)}
+
+	default:
+		diags = append(diags, Diag{Line: line, Col: col, Msg: fmt.Sprintf("unsupported for-condition: %s", w.Type(condNode))})
+		return nil, diags
+	}
+
+	// Resolve the body block.
+	if w.Type(bodyBlock) == "block" {
+		bodyStmtList := w.ChildByType(bodyBlock, "statement_list")
+		if bodyStmtList != nil {
+			bodyStmts, ds := resolveStmtList(w, bodyStmtList, tgt)
+			diags = append(diags, ds...)
+			result.Body = bodyStmts
+		}
+	}
+
+	return result, diags
+}
+
+// resolveSwitch resolves an expression_switch_statement node.
+//
+// The subject must be var(<IDENT>); each case must carry exactly one int_literal
+// expression; a default: clause is optional. Non-var subjects or non-int-literal
+// case expressions are rejected with diagnostics.
+func resolveSwitch(w *taproot.Walker, switchNode *gts.Node, tgt target.GameTarget) (Stmt, []Diag) {
+	var diags []Diag
+
+	// Named child 0 is the subject expression.
+	if switchNode.NamedChildCount() < 1 {
+		line, col := w.Pos(switchNode)
+		diags = append(diags, Diag{Line: line, Col: col, Msg: "switch: missing subject"})
+		return nil, diags
+	}
+
+	subjNode := switchNode.NamedChild(0)
+	line, col := w.Pos(subjNode)
+
+	if w.Type(subjNode) != "call_expression" {
+		diags = append(diags, Diag{Line: line, Col: col, Msg: "switch: subject must be var(IDENT)"})
+		return nil, diags
+	}
+	funcNode := w.Field(subjNode, "function")
+	if w.Text(funcNode) != "var" {
+		diags = append(diags, Diag{Line: line, Col: col, Msg: "switch: subject call must be var()"})
+		return nil, diags
+	}
+	argList := w.Field(subjNode, "arguments")
+	if argList == nil || argList.NamedChildCount() != 1 {
+		diags = append(diags, Diag{Line: line, Col: col, Msg: "switch: var() requires exactly one argument"})
+		return nil, diags
+	}
+	varIdent := argList.NamedChild(0)
+	result := Switch{Var: w.Text(varIdent)}
+
+	// Remaining named children are expression_case or default_case nodes.
+	for i := 1; i < switchNode.NamedChildCount(); i++ {
+		child := switchNode.NamedChild(i)
+		switch w.Type(child) {
+		case "expression_case":
+			// expression_case has named children: expression_list (index 0), statement_list (index 1).
+			if child.NamedChildCount() < 2 {
+				cl, cc := w.Pos(child)
+				diags = append(diags, Diag{Line: cl, Col: cc, Msg: "switch case: malformed case clause"})
+				continue
+			}
+			exprList := child.NamedChild(0)
+			stmtListNode := child.NamedChild(1)
+			// We expect a single int_literal in the expression_list.
+			if exprList.NamedChildCount() != 1 {
+				cl, cc := w.Pos(exprList)
+				diags = append(diags, Diag{Line: cl, Col: cc, Msg: "switch case: each case must have exactly one value"})
+				continue
+			}
+			valNode := exprList.NamedChild(0)
+			if w.Type(valNode) != "int_literal" {
+				cl, cc := w.Pos(valNode)
+				diags = append(diags, Diag{Line: cl, Col: cc, Msg: fmt.Sprintf("switch case: value must be int literal, got %s", w.Type(valNode))})
+				continue
+			}
+			caseStmts, ds := resolveStmtList(w, stmtListNode, tgt)
+			diags = append(diags, ds...)
+			result.Cases = append(result.Cases, SwitchCase{Val: w.Text(valNode), Body: caseStmts})
+
+		case "default_case":
+			// default_case has a single named child: statement_list.
+			if child.NamedChildCount() < 1 {
+				cl, cc := w.Pos(child)
+				diags = append(diags, Diag{Line: cl, Col: cc, Msg: "switch: empty default clause"})
+				continue
+			}
+			stmtListNode := child.NamedChild(0)
+			defaultStmts, ds := resolveStmtList(w, stmtListNode, tgt)
+			diags = append(diags, ds...)
+			result.Default = defaultStmts
 		}
 	}
 
