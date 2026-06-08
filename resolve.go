@@ -197,6 +197,14 @@ func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt
 		return nil, diags
 	}
 
+	// Reject else clauses — silently dropping them would be a correctness hazard.
+	// else/elif support is a documented next-iteration item.
+	if altNode := w.Field(ifNode, "alternative"); altNode != nil {
+		altLine, altCol := w.Pos(altNode)
+		diags = append(diags, Diag{Line: altLine, Col: altCol, Msg: "else clause not supported in poryscriptZ v0.1"})
+		return nil, diags
+	}
+
 	// Resolve the consequence block's statement list.
 	if conseqNode != nil {
 		bodyStmtList := w.ChildByType(conseqNode, "statement_list")

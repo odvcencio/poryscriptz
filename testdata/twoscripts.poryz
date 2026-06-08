@@ -1,0 +1,13 @@
+package m
+script ScriptA {
+	if flag(FLAG_A) {
+		end()
+	}
+	end()
+}
+script ScriptB {
+	if flag(FLAG_B) {
+		end()
+	}
+	end()
+}

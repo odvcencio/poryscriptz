@@ -21,14 +21,17 @@ type Instr struct {
 }
 
 // lowerCtx carries per-script mutable state for Lower.
+// labelSeq is a pointer so it can be shared across all scripts in a file,
+// making branch labels file-level monotonic and preventing duplicate labels
+// when multiple branching scripts are compiled together.
 type lowerCtx struct {
 	out      []Instr
-	labelSeq int // monotonic counter reset per-script; yields _L0, _L1, …
+	labelSeq *int // file-level monotonic counter; yields _L0, _L1, … across all scripts
 }
 
 func (c *lowerCtx) nextLabel() string {
-	l := fmt.Sprintf("_L%d", c.labelSeq)
-	c.labelSeq++
+	l := fmt.Sprintf("_L%d", *c.labelSeq)
+	*c.labelSeq++
 	return l
 }
 
@@ -82,8 +85,11 @@ func (c *lowerCtx) lowerIf(st If) {
 // Instrs with a non-empty Macro field bypass that lookup and use Macro directly.
 func Lower(p *Program) []Instr {
 	var out []Instr
+	// seq is shared across all scripts so that branch labels are file-level
+	// monotonic (_L0, _L1, …) and never collide between scripts in one file.
+	seq := 0
 	for _, s := range p.Scripts {
-		ctx := &lowerCtx{}
+		ctx := &lowerCtx{labelSeq: &seq}
 		// Entry-point sentinel — label only, no macro body.
 		ctx.append(Instr{Label: s.Name, Opcode: -1})
 		ctx.lowerStmts(s.Stmts)
