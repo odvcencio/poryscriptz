@@ -15,6 +15,10 @@ var GenerateLanguageAndBlob = gg.GenerateLanguageAndBlob
 
 func PoryscriptZGrammar() *Grammar {
 	return gg.ExtendGrammar("poryscriptz", gg.GoGrammar(), func(g *Grammar) {
+		// `script` is a hard keyword ONLY at top-level-declaration scope; the GLR
+		// conflict registered below lets it fall through to `identifier` in statements
+		// and expressions. (Latent collision only for a top-level `func script()`,
+		// which poryscriptZ never emits.)
 		g.Define("script_declaration",
 			gg.Seq(
 				gg.Str("script"),
