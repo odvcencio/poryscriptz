@@ -1,0 +1,11 @@
+package cf
+script S_elseif {
+	if flag(FLAG_NOTHING) {
+		setflag(FLAG_NOTHING)
+	} else if flag(FLAG_BEAT_AZALEA_ROCKETS) {
+		clearflag(FLAG_NOTHING)
+	} else {
+		setflag(FLAG_BEAT_AZALEA_ROCKETS)
+	}
+	end()
+}

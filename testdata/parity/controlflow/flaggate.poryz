@@ -1,0 +1,8 @@
+package cf
+script S_flaggate {
+	if flag(FLAG_NOTHING) {
+		end()
+	}
+	setflag(FLAG_NOTHING)
+	end()
+}
