@@ -14,6 +14,14 @@ type rawCmd struct {
 	Args []json.RawMessage `json:"args"`
 }
 
+type rawMacroFile struct {
+	Macros []rawMacroEntry `json:"macros"`
+}
+type rawMacroEntry struct {
+	Name string   `json:"name"`
+	Args []string `json:"args"`
+}
+
 func LoadScrcmdJSON(path string) (*Table, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -37,6 +45,46 @@ func LoadScrcmdJSON(path string) (*Table, error) {
 		t.byOpcode[op] = c
 	}
 	return t, nil
+}
+
+// LoadMacrosJSON reads a macros.json file and returns a MacroTable.
+func LoadMacrosJSON(path string) (*MacroTable, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read macros.json: %w", err)
+	}
+	var rf rawMacroFile
+	if err := json.Unmarshal(b, &rf); err != nil {
+		return nil, fmt.Errorf("parse macros.json: %w", err)
+	}
+	mt := &MacroTable{byName: map[string]*MacroEntry{}}
+	for _, rm := range rf.Macros {
+		e := &MacroEntry{Name: rm.Name, Args: make([]ArgKind, 0, len(rm.Args))}
+		for i, s := range rm.Args {
+			ak, err := macroArgKind(s)
+			if err != nil {
+				return nil, fmt.Errorf("macro %q arg %d: %w", rm.Name, i, err)
+			}
+			e.Args = append(e.Args, ak)
+		}
+		mt.byName[e.Name] = e
+	}
+	return mt, nil
+}
+
+func macroArgKind(s string) (ArgKind, error) {
+	switch s {
+	case "flag":
+		return ArgFlag, nil
+	case "var":
+		return ArgVar, nil
+	case "script":
+		return ArgLabel, nil
+	case "sym", "":
+		return ArgSym, nil
+	default:
+		return ArgSym, fmt.Errorf("unrecognised macro arg kind %q", s)
+	}
 }
 
 func argKind(raw json.RawMessage) (ArgKind, error) {

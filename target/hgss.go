@@ -2,23 +2,38 @@ package target
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"m31labs.dev/poryscriptz/vocab"
 )
 
-type hgss struct{ tbl *vocab.Table }
+type hgss struct {
+	tbl    *vocab.Table
+	macros *vocab.MacroTable
+}
 
+// HGSS loads the HGSS game target from scrcmdJSONPath.
+// It also attempts to load a macros.json file from the same directory as
+// scrcmdJSONPath; if that file does not exist, the macro table is empty
+// (all macros will be reported as unknown identifiers).
 func HGSS(scrcmdJSONPath string) (GameTarget, error) {
 	tbl, err := vocab.LoadScrcmdJSON(scrcmdJSONPath)
 	if err != nil {
 		return nil, err
 	}
-	return &hgss{tbl: tbl}, nil
+	macrosPath := filepath.Join(filepath.Dir(scrcmdJSONPath), "macros.json")
+	mt, err := vocab.LoadMacrosJSON(macrosPath)
+	if err != nil {
+		// macros.json is optional; treat a missing file as an empty table.
+		mt = nil
+	}
+	return &hgss{tbl: tbl, macros: mt}, nil
 }
 
-func (h *hgss) Name() string             { return "HGSS" }
-func (h *hgss) Vocabulary() *vocab.Table { return h.tbl }
+func (h *hgss) Name() string              { return "HGSS" }
+func (h *hgss) Vocabulary() *vocab.Table  { return h.tbl }
+func (h *hgss) Macros() *vocab.MacroTable { return h.macros }
 
 func (h *hgss) MacroName(opcode int) string {
 	if c, ok := h.tbl.ByOpcode(opcode); ok && c.Name != "" {

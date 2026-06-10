@@ -1,0 +1,19 @@
+{
+  "macros": [
+    {"name": "npc_msg",            "args": ["sym"]},
+    {"name": "closemsg",           "args": []},
+    {"name": "trainer_battle",     "args": ["sym", "sym", "sym", "sym"]},
+    {"name": "check_battle_won",   "args": ["var"]},
+    {"name": "giveitem_no_check",  "args": ["sym", "sym"]},
+    {"name": "give_mon",           "args": ["sym", "sym", "sym", "sym", "sym", "var"]},
+    {"name": "faceplayer",         "args": []},
+    {"name": "lockall",            "args": []},
+    {"name": "releaseall",         "args": []},
+    {"name": "play_se",            "args": ["sym"]},
+    {"name": "warp",               "args": ["sym", "sym", "sym", "sym", "sym"]},
+    {"name": "buffer_players_name","args": ["sym"]},
+    {"name": "apply_movement",     "args": ["sym", "sym"]},
+    {"name": "wait_movement",      "args": []},
+    {"name": "check_badge",        "args": ["sym", "var"]}
+  ]
+}

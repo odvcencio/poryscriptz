@@ -26,3 +26,31 @@ type Table struct {
 func (t *Table) ByName(n string) (*Command, bool) { c, ok := t.byName[n]; return c, ok }
 func (t *Table) ByOpcode(op int) (*Command, bool) { c, ok := t.byOpcode[op]; return c, ok }
 func (t *Table) Len() int                         { return len(t.byOpcode) }
+
+// MacroEntry describes a decomp script.inc macro: a name and its argument
+// count/shapes. Macro calls in .poryz emit verbatim into the .s output; the
+// decomp assembler expands them via script.inc at assemble time.
+type MacroEntry struct {
+	Name string
+	Args []ArgKind
+}
+
+// MacroTable is the lookup table for decomp macros (loaded from macros.json).
+type MacroTable struct {
+	byName map[string]*MacroEntry
+}
+
+func (m *MacroTable) ByName(n string) (*MacroEntry, bool) {
+	if m == nil {
+		return nil, false
+	}
+	e, ok := m.byName[n]
+	return e, ok
+}
+
+func (m *MacroTable) Len() int {
+	if m == nil {
+		return 0
+	}
+	return len(m.byName)
+}

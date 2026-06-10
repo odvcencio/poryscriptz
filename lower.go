@@ -46,6 +46,14 @@ func (c *lowerCtx) lowerStmts(stmts []Stmt) {
 				Opcode: st.Cmd.Opcode,
 				Args:   st.Args,
 			})
+		case MacroCall:
+			// Macro calls emit verbatim: "name arg1, arg2, …"
+			// The decomp assembler expands them via asm/macros/script.inc.
+			c.append(Instr{
+				Opcode: -1,
+				Macro:  st.Macro.Name,
+				Args:   st.Args,
+			})
 		case If:
 			c.lowerIf(st)
 		case While:

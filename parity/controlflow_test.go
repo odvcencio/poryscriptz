@@ -56,6 +56,11 @@ var controlFlowCases = []cfCase{
 	{name: "vargate", file: "vargate.poryz"},
 }
 
+// macrosCases lists v0.3 macro-vocabulary fixtures (MacrosAssembleClean gate).
+var macrosCases = []cfCase{
+	{name: "macros", file: "macros.poryz"},
+}
+
 // mwasBaseArgs are the MWAS flags shared by all assembler invocations.
 // They mirror the decomp Makefile exactly (same as TestCompareScrSeq0027).
 var mwasBaseArgs = []string{
@@ -116,6 +121,54 @@ func TestControlFlowAssemblesClean(t *testing.T) {
 
 	// --- run one sub-test per fixture ---
 	for _, tc := range controlFlowCases {
+		tc := tc // capture
+		t.Run(tc.name, func(t *testing.T) {
+			runAssemblesClean(t, tc, cfDir, gt, hgRoot, mwas, wp)
+		})
+	}
+}
+
+// TestMacrosAssembleClean compiles each v0.3 macro-vocabulary .poryz fixture
+// and asserts the emitted .s assembles cleanly under MWAS (exit 0).
+// This is the v0.3 macro-vocabulary assembles-clean gate (analogous to
+// TestControlFlowAssemblesClean for v0.2 control-flow constructs).
+func TestMacrosAssembleClean(t *testing.T) {
+	// --- prerequisite checks (same as TestCompareScrSeq0027) ---
+	hgRoot := pokehgRoot(t)
+	mwas := filepath.Join(hgRoot, "tools", "mwccarm", "2.0", "sp2p2", "mwasmarm.exe")
+	wp := winePrefix()
+
+	for _, check := range []struct {
+		label string
+		path  string
+	}{
+		{"decomp root", hgRoot},
+		{"mwasmarm.exe", mwas},
+		{"wine prefix", wp},
+	} {
+		if _, err := os.Stat(check.path); err != nil {
+			t.Skipf("decompparity: prerequisite not found (%s=%s): %v", check.label, check.path, err)
+		}
+	}
+	if _, err := exec.LookPath("wine"); err != nil {
+		t.Skip("decompparity: wine not in PATH")
+	}
+
+	// --- locate testdata/parity/controlflow/ ---
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("decompparity: runtime.Caller failed")
+	}
+	cfDir := filepath.Join(filepath.Dir(thisFile), "..", "testdata", "parity", "controlflow")
+
+	// --- load HGSS target once ---
+	gt, err := target.HGSS(scrcmdJSON(t))
+	if err != nil {
+		t.Fatalf("load HGSS target: %v", err)
+	}
+
+	// --- run one sub-test per macro fixture ---
+	for _, tc := range macrosCases {
 		tc := tc // capture
 		t.Run(tc.name, func(t *testing.T) {
 			runAssemblesClean(t, tc, cfDir, gt, hgRoot, mwas, wp)

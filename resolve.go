@@ -35,6 +35,16 @@ type Call struct {
 
 func (Call) isStmt() {}
 
+// MacroCall is a resolved script.inc macro call statement.
+// The macro is emitted verbatim into the .s output as "name arg1, arg2, …";
+// the decomp assembler expands it via asm/macros/script.inc at assemble time.
+type MacroCall struct {
+	Macro *vocab.MacroEntry
+	Args  []string // raw arg source text; emitted as-is
+}
+
+func (MacroCall) isStmt() {}
+
 // If is a resolved if-statement with a flag or var-equality condition.
 // Kind is "flag" or "vareq"; the corresponding fields (Flag / Var+Value) are set.
 // Else holds the resolved else-branch statements (nil when there is no else).
@@ -446,7 +456,9 @@ func resolveSwitch(w *taproot.Walker, switchNode *gts.Node, tgt target.GameTarge
 	return result, diags
 }
 
-// resolveCall type-checks a single call_expression node against the vocabulary.
+// resolveCall type-checks a single call_expression node against the vocabulary
+// and the macro table. scrcmd commands are resolved first; if not found there,
+// the macro table is checked. Unknown identifiers always produce a diagnostic.
 func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (Stmt, []Diag) {
 	var diags []Diag
 
@@ -454,16 +466,7 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 	name := w.Text(funcNode)
 	line, col := w.Pos(funcNode)
 
-	cmd, ok := tgt.Vocabulary().ByName(name)
-	if !ok {
-		diags = append(diags, Diag{
-			Line: line,
-			Col:  col,
-			Msg:  fmt.Sprintf("command %q not in %s vocabulary", name, tgt.Name()),
-		})
-		return nil, diags
-	}
-
+	// Collect raw args (shared by both resolution paths).
 	argList := w.Field(callExpr, "arguments")
 	gotArgCount := 0
 	var rawArgs []string
@@ -475,14 +478,37 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 		}
 	}
 
-	if gotArgCount != len(cmd.Args) {
-		diags = append(diags, Diag{
-			Line: line,
-			Col:  col,
-			Msg:  fmt.Sprintf("%s expects %d args, got %d", name, len(cmd.Args), gotArgCount),
-		})
-		return nil, diags
+	// --- try scrcmd vocabulary first ---
+	if cmd, ok := tgt.Vocabulary().ByName(name); ok {
+		if gotArgCount != len(cmd.Args) {
+			diags = append(diags, Diag{
+				Line: line,
+				Col:  col,
+				Msg:  fmt.Sprintf("%s expects %d args, got %d", name, len(cmd.Args), gotArgCount),
+			})
+			return nil, diags
+		}
+		return Call{Cmd: cmd, Args: rawArgs}, diags
 	}
 
-	return Call{Cmd: cmd, Args: rawArgs}, diags
+	// --- try macro table second ---
+	if me, ok := tgt.Macros().ByName(name); ok {
+		if gotArgCount != len(me.Args) {
+			diags = append(diags, Diag{
+				Line: line,
+				Col:  col,
+				Msg:  fmt.Sprintf("macro %s expects %d args, got %d", name, len(me.Args), gotArgCount),
+			})
+			return nil, diags
+		}
+		return MacroCall{Macro: me, Args: rawArgs}, diags
+	}
+
+	// --- unknown identifier ---
+	diags = append(diags, Diag{
+		Line: line,
+		Col:  col,
+		Msg:  fmt.Sprintf("command %q not in %s vocabulary", name, tgt.Name()),
+	})
+	return nil, diags
 }
