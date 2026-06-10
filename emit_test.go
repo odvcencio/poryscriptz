@@ -124,3 +124,19 @@ func TestGoldenMacros(t *testing.T) {
 		t.Fatalf("golden mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, want)
 	}
 }
+
+// TestGoldenGiveitemNoCheck is a targeted golden test for the MacroCall-lowering
+// path using giveitem_no_check — the only macro name exclusive to the macro
+// table (no scrcmd collision).  A regression in MacroCall lowering would cause
+// this fixture to fail distinctly from the scrcmd emit path.
+func TestGoldenGiveitemNoCheck(t *testing.T) {
+	src, _ := os.ReadFile("testdata/giveitem_no_check.poryz")
+	want, _ := os.ReadFile("testdata/giveitem_no_check.golden")
+	got, diags, err := Compile(src, hgssT(t))
+	if err != nil || len(diags) != 0 {
+		t.Fatalf("compile: err=%v diags=%v", err, diags)
+	}
+	if got != string(want) {
+		t.Fatalf("golden mismatch:\n--- got ---\n%s\n--- want ---\n%s", got, want)
+	}
+}

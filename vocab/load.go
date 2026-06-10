@@ -74,11 +74,11 @@ func LoadMacrosJSON(path string) (*MacroTable, error) {
 
 func macroArgKind(s string) (ArgKind, error) {
 	switch s {
-	case "flag":
+	case "flag": // reserved for future macros that take FLAG_* arguments; no current macro uses this
 		return ArgFlag, nil
 	case "var":
 		return ArgVar, nil
-	case "script":
+	case "script": // reserved for future macros that take label/script arguments; no current macro uses this
 		return ArgLabel, nil
 	case "sym", "":
 		return ArgSym, nil

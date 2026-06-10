@@ -1,0 +1,5 @@
+package m
+script GiveItem {
+	giveitem_no_check(ITEM_POTION, 1)
+	end()
+}

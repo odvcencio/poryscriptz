@@ -1,0 +1,9 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef GiveItem
+	scrdef_end
+GiveItem:
+	giveitem_no_check ITEM_POTION, 1
+	end
