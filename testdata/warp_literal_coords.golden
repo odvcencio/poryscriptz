@@ -1,0 +1,10 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef Scr_Test_WarpLiteral
+	scrdef_end
+Scr_Test_WarpLiteral:
+	lockall
+	warp MAP_PALLET_TOWN_OAKS_LAB, 0, 8, 11, DIR_SOUTH
+	releaseall
