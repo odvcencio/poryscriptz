@@ -16,5 +16,6 @@ script S_macros {
 	check_badge(BADGE_ZEPHYR, VAR_TEMP_x4000)
 	releaseall()
 	warp(MAP_PALLET, 0, 0, 0, 0)
+	warp(MAP_PALLET_TOWN_OAKS_LAB, 0, 8, 11, DIR_SOUTH)
 	end()
 }
