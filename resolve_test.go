@@ -134,6 +134,53 @@ func TestResolveMacroArityMismatchExclusive(t *testing.T) {
 	}
 }
 
+// TestResolveWarpLiteralCoordsOK is the regression test for the downstream
+// bug report: "warp cannot express literal tile coords since its var arg type
+// expects VAR_* constants".
+//
+// Root-cause analysis: the scrcmd.json entry for warp has args
+// ["maps", 2, "var", "var", "direction"] — the 3rd and 4th positions are
+// marked "var".  The resolver (resolveCall) performs ARITY-ONLY checking; it
+// never validates individual arg kinds against scrcmd schema types.  Literal
+// integers (8, 11) and symbolic constants (MAP_PALLET_TOWN_OAKS_LAB,
+// DIR_SOUTH) therefore pass through verbatim — the decomp assembler resolves
+// them.  This test pins that no-kind-validation contract.
+func TestResolveWarpLiteralCoordsOK(t *testing.T) {
+	src := []byte("package m\nscript S {\n\twarp(MAP_PALLET_TOWN_OAKS_LAB, 0, 8, 11, DIR_SOUTH)\n\tend()\n}\n")
+	_, diags, err := Compile(src, hgssT(t))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	if len(diags) != 0 {
+		t.Fatalf("warp with literal tile coords must compile without diagnostics, got: %v", diags)
+	}
+}
+
+// TestResolveWarpArityMismatchMessage confirms that a wrong-arity warp call
+// produces a diagnostic that names the command and states both expected and
+// actual arg counts.
+func TestResolveWarpArityMismatchMessage(t *testing.T) {
+	// warp expects 5 args; supply 4 (omitting DIR_SOUTH).
+	src := []byte("package m\nscript S {\n\twarp(MAP_PALLET_TOWN_OAKS_LAB, 0, 8, 11)\n}\n")
+	_, diags, err := Compile(src, hgssT(t))
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	if len(diags) == 0 {
+		t.Fatal("want arity-mismatch diagnostic for 4-arg warp, got none")
+	}
+	msg := diags[0].Msg
+	if !strings.Contains(msg, "warp") {
+		t.Errorf("diagnostic must name the command; got: %q", msg)
+	}
+	if !strings.Contains(msg, "5") {
+		t.Errorf("diagnostic must state expected arity 5; got: %q", msg)
+	}
+	if !strings.Contains(msg, "4") {
+		t.Errorf("diagnostic must state actual arg count 4; got: %q", msg)
+	}
+}
+
 // TestResolveScrCmdWinsOnCollision pins the deliberate "scrcmd wins on
 // collision" order: give_mon appears in both scrcmd.json (6 args) and
 // macros.json (6 args).  Supplying 6 correct args must resolve to a scrcmd
