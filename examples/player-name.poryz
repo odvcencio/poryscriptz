@@ -1,0 +1,7 @@
+package m
+
+script Event {
+    BufferPlayersName(0)
+    message(0)
+    End()
+}

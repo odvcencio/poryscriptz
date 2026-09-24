@@ -1,0 +1,10 @@
+package m
+
+script Event {
+    Call(_Helper)
+    End()
+}
+label _Helper {
+    PlaySE(SEQ_SE_DP_SELECT)
+    Return()
+}

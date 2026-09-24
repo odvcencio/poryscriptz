@@ -1,0 +1,13 @@
+package m
+
+script Event {
+    switch var(VAR_TEMP_x4000) {
+    case 1:
+        message(1)
+    case 2:
+        message(2)
+    default:
+        message(0)
+    }
+    End()
+}

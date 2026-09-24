@@ -1,0 +1,56 @@
+{
+  "name": "poryz",
+  "displayName": "poryz",
+  "description": "Friendly HeartGold event scripts with diagnostics, completion, navigation, and syntax colors.",
+  "version": "0.3.0",
+  "publisher": "odvcencio",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:poryz"
+  ],
+  "main": "./extension.js",
+  "scripts": {
+    "package": "mkdir -p dist && vsce package --out dist/poryz-0.3.0.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "10.1.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "4.0.0"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "poryz",
+        "aliases": [
+          "poryz",
+          "poryScriptZ"
+        ],
+        "extensions": [
+          ".poryz"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "title": "poryz",
+      "properties": {
+        "poryz.server.path": {
+          "type": "string",
+          "default": "poryz",
+          "description": "Path to the poryz binary."
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odvcencio/poryscriptz.git"
+  }
+}

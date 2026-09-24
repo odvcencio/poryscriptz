@@ -1,0 +1,6 @@
+package m
+
+script Event {
+    var_copy(VAR_TEMP_x4001, VAR_TEMP_x4000)
+    End()
+}

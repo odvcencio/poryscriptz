@@ -1,0 +1,6 @@
+package m
+
+script Event {
+    var_set(VAR_TEMP_x4000, 1)
+    End()
+}

@@ -1,0 +1,11 @@
+package m
+
+script Event {
+    LockAll()
+    FacePlayer()
+    NPCMsg(0)
+    WaitButton()
+    CloseMsg()
+    ReleaseAll()
+    End()
+}

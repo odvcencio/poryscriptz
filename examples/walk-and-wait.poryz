@@ -1,0 +1,10 @@
+package m
+
+script Event {
+    move_actor_and_wait(0, _Walk)
+    End()
+}
+movement _Walk {
+    WalkNormalNorth(2)
+    EndMovement()
+}

@@ -1,0 +1,10 @@
+package m
+
+script Event {
+    give_item(ITEM_POTION, 1, _BagFull)
+    flag_set(FLAG_UNK_042)
+    End()
+}
+label _BagFull {
+    End()
+}

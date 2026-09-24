@@ -1,0 +1,9 @@
+package m
+
+script Event {
+    LockAll()
+    trainer_battle_simple(TRAINER_YOUNGSTER_JOEY)
+    CheckBattleWon(VAR_SPECIAL_RESULT)
+    ReleaseAll()
+    End()
+}

@@ -1,0 +1,12 @@
+package m
+
+script Event {
+    LockAll()
+    NPCMsg(0)
+    WaitButton()
+    NPCMsg(1)
+    WaitButton()
+    CloseMsg()
+    ReleaseAll()
+    End()
+}
