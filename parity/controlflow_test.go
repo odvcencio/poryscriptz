@@ -59,6 +59,8 @@ var controlFlowCases = []cfCase{
 // macrosCases lists v0.3 macro-vocabulary fixtures (MacrosAssembleClean gate).
 var macrosCases = []cfCase{
 	{name: "macros", file: "macros.poryz"},
+	{name: "movement", file: "movement.poryz"},
+	{name: "patterns", file: "patterns.poryz"},
 }
 
 // mwasBaseArgs are the MWAS flags shared by all assembler invocations.
@@ -87,7 +89,7 @@ var mwasBaseArgs = []string{
 func TestControlFlowAssemblesClean(t *testing.T) {
 	// --- prerequisite checks (same as TestCompareScrSeq0027) ---
 	hgRoot := pokehgRoot(t)
-	mwas := filepath.Join(hgRoot, "tools", "mwccarm", "2.0", "sp2p2", "mwasmarm.exe")
+	mwas := mwasPath(hgRoot)
 	wp := winePrefix()
 
 	for _, check := range []struct {
@@ -135,7 +137,7 @@ func TestControlFlowAssemblesClean(t *testing.T) {
 func TestMacrosAssembleClean(t *testing.T) {
 	// --- prerequisite checks (same as TestCompareScrSeq0027) ---
 	hgRoot := pokehgRoot(t)
-	mwas := filepath.Join(hgRoot, "tools", "mwccarm", "2.0", "sp2p2", "mwasmarm.exe")
+	mwas := mwasPath(hgRoot)
 	wp := winePrefix()
 
 	for _, check := range []struct {

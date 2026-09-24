@@ -9,8 +9,7 @@
 //   - Wine prefix: $POKEHG_WINEPREFIX or $WINEPREFIX, defaulting to ~/.wine-pokehg-build
 //   - Metrowerks MWAS: $POKEHG_ROOT/tools/mwccarm/2.0/sp2p2/mwasmarm.exe
 //   - arm-none-eabi-objcopy in $PATH
-//   - $POKEHG_ROOT: path to the pokeheartgold decomp checkout, defaulting to
-//     ../pokeheartgold-mmo/vendor/pokeheartgold relative to this file's module root
+//   - $POKEHG_ROOT: explicit path to an isolated pokeheartgold decomp checkout
 //
 // # Running manually
 //
@@ -52,20 +51,14 @@ import (
 // from scr_seq.sha1 in the decomp repo.
 const refSHA1 = "e8cf4832db8e1131f810e3ee00cbece3df9fff08"
 
-// pokehgRoot returns the path to the pokeheartgold decomp checkout.
-// Override via $POKEHG_ROOT.
+// pokehgRoot requires an explicit isolated decomp checkout.
 func pokehgRoot(t *testing.T) string {
 	t.Helper()
 	if v := os.Getenv("POKEHG_ROOT"); v != "" {
 		return v
 	}
-	// Default: this repo lives at ~/work/poryscriptz, decomp at
-	// ~/work/pokeheartgold-mmo/vendor/pokeheartgold.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skipf("decompparity: cannot determine home dir: %v", err)
-	}
-	return filepath.Join(home, "work", "pokeheartgold-mmo", "vendor", "pokeheartgold")
+	t.Skip("decompparity: set POKEHG_ROOT to an isolated decomp checkout")
+	return ""
 }
 
 // winePrefix returns the Wine prefix path.
@@ -78,6 +71,14 @@ func winePrefix() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".wine-pokehg-build")
+}
+
+// mwasPath lets a separate, read-only decomp checkout use an installed MWAS.
+func mwasPath(hgRoot string) string {
+	if v := os.Getenv("POKEHG_MWAS"); v != "" {
+		return v
+	}
+	return filepath.Join(hgRoot, "tools", "mwccarm", "2.0", "sp2p2", "mwasmarm.exe")
 }
 
 // scrcmdJSON returns the path to the vocab/testdata/scrcmd.json relative to the
@@ -108,7 +109,7 @@ func scrcmdJSON(t *testing.T) string {
 func TestCompareScrSeq0027(t *testing.T) {
 	// --- prerequisite checks ---
 	hgRoot := pokehgRoot(t)
-	mwas := filepath.Join(hgRoot, "tools", "mwccarm", "2.0", "sp2p2", "mwasmarm.exe")
+	mwas := mwasPath(hgRoot)
 	winePrefix := winePrefix()
 
 	for _, check := range []struct {

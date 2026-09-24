@@ -2,6 +2,9 @@ package poryscriptz
 
 import (
 	"fmt"
+	"path"
+	"strconv"
+	"strings"
 
 	gts "github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/taproot"
@@ -15,8 +18,21 @@ type Diag struct {
 	Msg       string
 }
 
-// Program is the resolved IR produced by Resolve.
-type Program struct{ Scripts []*Script }
+// Program is the resolved IR produced by Resolve. Sections preserve source
+// order; Scripts contains only the entry points written to the scrdef table.
+type Program struct {
+	Scripts  []*Script
+	Sections []Section
+	Includes []string
+}
+
+// Section is a script, a non-entry label, or a four-byte alignment directive.
+type Section struct {
+	Name     string
+	Stmts    []Stmt
+	Align    bool
+	Movement bool
+}
 
 // Script is a resolved script declaration.
 type Script struct {
@@ -44,6 +60,17 @@ type MacroCall struct {
 }
 
 func (MacroCall) isStmt() {}
+
+// PatternCall is a checked v0.3 event pattern. Lower expands it into HGSS
+// script.inc commands without adding a new VM opcode.
+type PatternCall struct {
+	Name string
+	Args []string
+	Line int // source position of a branch or movement target, else the call
+	Col  int
+}
+
+func (PatternCall) isStmt() {}
 
 // If is a resolved if-statement with a flag or var-equality condition.
 // Kind is "flag" or "vareq"; the corresponding fields (Flag / Var+Value) are set.
@@ -92,24 +119,79 @@ type Switch struct {
 func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program, []Diag) {
 	prog := &Program{}
 	var diags []Diag
+	seenLabels := make(map[string]bool)
 
 	var walk func(n *gts.Node)
 	walk = func(n *gts.Node) {
 		if n == nil {
 			return
 		}
-		if w.Type(n) == "script_declaration" {
-			s, ds := resolveScript(w, n, tgt)
-			prog.Scripts = append(prog.Scripts, s)
+		switch w.Type(n) {
+		case "script_declaration", "label_declaration", "movement_declaration":
+			var s *Script
+			var ds []Diag
+			if w.Type(n) == "movement_declaration" {
+				s, ds = resolveMovement(w, n)
+			} else {
+				s, ds = resolveScript(w, n, tgt)
+			}
 			diags = append(diags, ds...)
-			return // don't recurse into the script — resolveScript handles it
+			if generatedLabelName(s.Name) {
+				line, col := w.Pos(w.Field(n, "name"))
+				diags = append(diags, Diag{Line: line, Col: col, Msg: fmt.Sprintf("label %q uses reserved generated-label namespace", s.Name)})
+			}
+			if seenLabels[s.Name] {
+				line, col := w.Pos(w.Field(n, "name"))
+				diags = append(diags, Diag{Line: line, Col: col, Msg: fmt.Sprintf("duplicate label %q", s.Name)})
+			}
+			seenLabels[s.Name] = true
+			if w.Type(n) == "script_declaration" {
+				prog.Scripts = append(prog.Scripts, s)
+			}
+			prog.Sections = append(prog.Sections, Section{Name: s.Name, Stmts: s.Stmts, Movement: w.Type(n) == "movement_declaration"})
+			return // resolveScript handles the block
+		case "align_declaration":
+			prog.Sections = append(prog.Sections, Section{Align: true})
+			return
+		case "include_declaration":
+			header, err := includePath(w.Text(w.Field(n, "path")))
+			if err != nil {
+				line, col := w.Pos(n)
+				diags = append(diags, Diag{Line: line, Col: col, Msg: err.Error()})
+			} else {
+				prog.Includes = append(prog.Includes, header)
+			}
+			return
 		}
 		for i := 0; i < n.ChildCount(); i++ {
 			walk(n.Child(i))
 		}
 	}
 	walk(root)
+	diags = append(diags, validatePatternTargets(prog)...)
 	return prog, diags
+}
+
+func generatedLabelName(name string) bool {
+	if !strings.HasPrefix(name, "_L") || len(name) < 3 {
+		return false
+	}
+	for _, c := range name[2:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func includePath(literal string) (string, error) {
+	header, err := strconv.Unquote(literal)
+	if err != nil || !strings.HasSuffix(header, ".h") || path.IsAbs(header) ||
+		path.Clean(header) != header || strings.HasPrefix(header, "../") ||
+		strings.ContainsAny(header, "\\\r\n\"") {
+		return "", fmt.Errorf("include: expected a relative .h path without traversal")
+	}
+	return header, nil
 }
 
 // resolveScript resolves a single script_declaration node.
@@ -476,6 +558,9 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 			argNode := argList.NamedChild(i)
 			rawArgs = append(rawArgs, w.Text(argNode))
 		}
+	}
+	if stmt, ds, ok := resolvePattern(w, name, argList, rawArgs, line, col, tgt.Name()); ok {
+		return stmt, ds
 	}
 
 	// --- try scrcmd vocabulary first ---

@@ -14,10 +14,11 @@ import "fmt"
 // not base opcodes in scrcmd.json and therefore have no Opcode index.
 // TODO(task-N): route these through GameTarget when a second game is added.
 type Instr struct {
-	Label  string   // entry-point or branch-target label; non-empty on sentinels
-	Opcode int      // -1 for label-only sentinels; otherwise the vocab opcode
-	Macro  string   // literal macro override; takes precedence over Opcode in Emit
-	Args   []string // raw arg text (empty slice for zero-arg commands)
+	Label     string   // entry-point or branch-target label; non-empty on sentinels
+	Opcode    int      // -1 for label-only sentinels; otherwise the vocab opcode
+	Macro     string   // literal macro override; takes precedence over Opcode in Emit
+	Args      []string // raw arg text (empty slice for zero-arg commands)
+	Directive string   // assembler directive, emitted without a command lookup
 }
 
 // lowerCtx carries per-script mutable state for Lower.
@@ -54,6 +55,10 @@ func (c *lowerCtx) lowerStmts(stmts []Stmt) {
 				Macro:  st.Macro.Name,
 				Args:   st.Args,
 			})
+		case PatternCall:
+			for _, ins := range expandPattern(st.Name, st.Args) {
+				c.append(ins)
+			}
 		case If:
 			c.lowerIf(st)
 		case While:
@@ -234,7 +239,20 @@ func Lower(p *Program) []Instr {
 	// seq is shared across all scripts so that branch labels are file-level
 	// monotonic (_L0, _L1, …) and never collide between scripts in one file.
 	seq := 0
-	for _, s := range p.Scripts {
+	sections := p.Sections
+	if len(sections) == 0 {
+		for _, s := range p.Scripts {
+			sections = append(sections, Section{Name: s.Name, Stmts: s.Stmts})
+		}
+	}
+	for _, s := range sections {
+		if s.Align {
+			out = append(out, Instr{Opcode: -1, Directive: ".balign 4, 0"})
+			continue
+		}
+		if s.Movement {
+			out = append(out, Instr{Opcode: -1, Directive: ".balign 4, 0"})
+		}
 		ctx := &lowerCtx{labelSeq: &seq}
 		// Entry-point sentinel — label only, no macro body.
 		ctx.append(Instr{Label: s.Name, Opcode: -1})

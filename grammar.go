@@ -25,7 +25,28 @@ func PoryscriptZGrammar() *Grammar {
 				gg.Field("name", gg.Sym("identifier")),
 				gg.Sym("block"),
 			))
-		gg.AppendChoice(g, "_top_level_declaration", gg.Sym("script_declaration"))
-		gg.AddConflict(g, "_top_level_declaration", "script_declaration")
+		g.Define("label_declaration", gg.Seq(
+			gg.Str("label"),
+			gg.Field("name", gg.Sym("identifier")),
+			gg.Sym("block"),
+		))
+		g.Define("movement_declaration", gg.Seq(
+			gg.Str("movement"),
+			gg.Field("name", gg.Sym("identifier")),
+			gg.Sym("block"),
+		))
+		g.Define("include_declaration", gg.Seq(
+			gg.Str("include"),
+			gg.Field("path", gg.Sym("interpreted_string_literal")),
+		))
+		g.Define("align_declaration", gg.Seq(
+			gg.Str("align4"), gg.Str("("), gg.Str(")"),
+		))
+		for _, rule := range []string{
+			"script_declaration", "label_declaration", "movement_declaration", "include_declaration", "align_declaration",
+		} {
+			gg.AppendChoice(g, "_top_level_declaration", gg.Sym(rule))
+			gg.AddConflict(g, "_top_level_declaration", rule)
+		}
 	})
 }

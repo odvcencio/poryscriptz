@@ -1,0 +1,30 @@
+package m
+
+script PatternDemo {
+	lockall()
+	faceplayer()
+	message(1)
+	say(2)
+	trainer_battle_simple(1)
+	give_item(ITEM_POTION, 1, _BagFull)
+	flag_set(FLAG_GAME_CLEAR)
+	var_set(VAR_TEMP_x4000, 1)
+	if_flag_set(FLAG_GAME_CLEAR, _Done)
+	if_var_eq(VAR_TEMP_x4000, 1, _Done)
+	warp_to(MAP_PALLET, 0, 0, 0, 0)
+	end()
+}
+
+label _BagFull {
+	closemsg()
+	releaseall()
+	end()
+}
+
+label _Done {
+	flag_clear(FLAG_GAME_CLEAR)
+	var_copy(VAR_TEMP_x4001, VAR_TEMP_x4000)
+	warp_to(MAP_PALLET, 0, 0, 0, 0)
+	end()
+}
+align4()

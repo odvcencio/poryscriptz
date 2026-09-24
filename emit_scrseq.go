@@ -30,13 +30,19 @@ func Emit(prog *Program, tgt target.GameTarget) string {
 	var b strings.Builder
 
 	// File preamble (includes + .rodata).
-	b.WriteString(tgt.Preamble(""))
+	b.WriteString(tgt.Preamble(prog.Includes...))
 
 	// scrdef table.
 	b.WriteString(tgt.Header(labels))
 
 	// Script bodies.
 	for _, ins := range instrs {
+		if ins.Directive != "" {
+			b.WriteByte('\t')
+			b.WriteString(ins.Directive)
+			b.WriteByte('\n')
+			continue
+		}
 		if ins.Label != "" {
 			// Entry-point sentinel: emit the label line.
 			b.WriteString(ins.Label)

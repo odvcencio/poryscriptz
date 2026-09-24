@@ -43,11 +43,11 @@ func (h *hgss) MacroName(opcode int) string {
 }
 
 // Preamble matches the header of every real scr_seq/*.s (lines at column 0).
-func (h *hgss) Preamble(eventHeader string) string {
+func (h *hgss) Preamble(headers ...string) string {
 	var b strings.Builder
 	b.WriteString("#include \"constants/scrcmd.h\"\n")
-	if eventHeader != "" {
-		fmt.Fprintf(&b, "#include \"%s\"\n", eventHeader)
+	for _, header := range headers {
+		fmt.Fprintf(&b, "#include \"%s\"\n", header)
 	}
 	b.WriteString(".include \"asm/macros/script.inc\"\n\n.rodata\n")
 	return b.String()
