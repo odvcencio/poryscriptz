@@ -48,11 +48,15 @@ func (c *lowerCtx) lowerStmts(stmts []Stmt) {
 				Args:   st.Args,
 			})
 		case MacroCall:
+			name := st.Macro.Name
+			if st.Macro.EmitName != "" {
+				name = st.Macro.EmitName
+			}
 			// Macro calls emit verbatim: "name arg1, arg2, …"
 			// The decomp assembler expands them via asm/macros/script.inc.
 			c.append(Instr{
 				Opcode: -1,
-				Macro:  st.Macro.Name,
+				Macro:  name,
 				Args:   st.Args,
 			})
 		case PatternCall:
@@ -246,6 +250,10 @@ func Lower(p *Program) []Instr {
 		}
 	}
 	for _, s := range sections {
+		if s.SourceInclude != "" {
+			out = append(out, Instr{Opcode: -1, Directive: fmt.Sprintf(".include %q", s.SourceInclude)})
+			continue
+		}
 		if s.Align {
 			out = append(out, Instr{Opcode: -1, Directive: ".balign 4, 0"})
 			continue
@@ -255,7 +263,9 @@ func Lower(p *Program) []Instr {
 		}
 		ctx := &lowerCtx{labelSeq: &seq}
 		// Entry-point sentinel — label only, no macro body.
-		ctx.append(Instr{Label: s.Name, Opcode: -1})
+		if s.Name != "" {
+			ctx.append(Instr{Label: s.Name, Opcode: -1})
+		}
 		ctx.lowerStmts(s.Stmts)
 		out = append(out, ctx.out...)
 	}

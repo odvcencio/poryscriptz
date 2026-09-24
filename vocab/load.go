@@ -1,10 +1,16 @@
 package vocab
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"os"
 )
+
+//go:embed testdata/*.json
+var bundled embed.FS
+
+func Bundled(name string) ([]byte, error) { return bundled.ReadFile("testdata/" + name) }
 
 type rawFile struct {
 	Commands []rawCmd `json:"commands"`
@@ -18,8 +24,14 @@ type rawMacroFile struct {
 	Macros []rawMacroEntry `json:"macros"`
 }
 type rawMacroEntry struct {
-	Name string   `json:"name"`
-	Args []string `json:"args"`
+	Name      string   `json:"name"`
+	Args      []string `json:"args"`
+	MinArgs   *int     `json:"min_args,omitempty"`
+	Doc       string   `json:"doc,omitempty"`
+	Params    []string `json:"params,omitempty"`
+	Movement  bool     `json:"movement,omitempty"`
+	Canonical string   `json:"canonical,omitempty"`
+	Opcode    *int     `json:"opcode,omitempty"`
 }
 
 func LoadScrcmdJSON(path string) (*Table, error) {
@@ -27,6 +39,10 @@ func LoadScrcmdJSON(path string) (*Table, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read scrcmd.json: %w", err)
 	}
+	return ParseScrcmdJSON(b)
+}
+
+func ParseScrcmdJSON(b []byte) (*Table, error) {
 	var rf rawFile
 	if err := json.Unmarshal(b, &rf); err != nil {
 		return nil, fmt.Errorf("parse scrcmd.json: %w", err)
@@ -53,13 +69,20 @@ func LoadMacrosJSON(path string) (*MacroTable, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read macros.json: %w", err)
 	}
+	return ParseMacrosJSON(b)
+}
+
+func ParseMacrosJSON(b []byte) (*MacroTable, error) {
 	var rf rawMacroFile
 	if err := json.Unmarshal(b, &rf); err != nil {
 		return nil, fmt.Errorf("parse macros.json: %w", err)
 	}
 	mt := &MacroTable{byName: map[string]*MacroEntry{}}
 	for _, rm := range rf.Macros {
-		e := &MacroEntry{Name: rm.Name, Args: make([]ArgKind, 0, len(rm.Args))}
+		e := &MacroEntry{Name: rm.Name, Args: make([]ArgKind, 0, len(rm.Args)), MinArgs: len(rm.Args), Doc: rm.Doc, Params: rm.Params, Movement: rm.Movement, Canonical: rm.Canonical, Opcode: rm.Opcode}
+		if rm.MinArgs != nil {
+			e.MinArgs = *rm.MinArgs
+		}
 		for i, s := range rm.Args {
 			ak, err := macroArgKind(s)
 			if err != nil {

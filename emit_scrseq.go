@@ -26,6 +26,9 @@ func Emit(prog *Program, tgt target.GameTarget) string {
 	for _, s := range prog.Scripts {
 		labels = append(labels, s.Name)
 	}
+	if prog.Entries != nil {
+		labels = prog.Entries
+	}
 
 	var b strings.Builder
 
@@ -33,7 +36,51 @@ func Emit(prog *Program, tgt target.GameTarget) string {
 	b.WriteString(tgt.Preamble(prog.Includes...))
 
 	// scrdef table.
-	b.WriteString(tgt.Header(labels))
+	if !prog.HasInitHeader {
+		if prog.PretDialect {
+			for _, l := range labels {
+				b.WriteString("\tScrDef ")
+				b.WriteString(l)
+				b.WriteByte('\n')
+			}
+			b.WriteString("\tScrDefEnd\n")
+		} else {
+			b.WriteString(tgt.Header(labels))
+		}
+		for i := 0; i < prog.ExtraTableEnds; i++ {
+			if prog.PretDialect {
+				b.WriteString("\tScrDefEnd\n")
+			} else {
+				b.WriteString("\tscrdef_end\n")
+			}
+		}
+	} else {
+		for _, ins := range Lower(&Program{Sections: []Section{{Stmts: prog.InitHeader}}}) {
+			name := ins.Macro
+			if name == "" {
+				if prog.PretDialect {
+					if canonical, ok := tgt.(interface{ CanonicalOpcode(int) string }); ok {
+						name = canonical.CanonicalOpcode(ins.Opcode)
+					}
+				}
+				if name == "" {
+					name = tgt.MacroName(ins.Opcode)
+				}
+			}
+			if prog.PretDialect {
+				if canonical, ok := tgt.(interface{ CanonicalMacro(string) string }); ok {
+					name = canonical.CanonicalMacro(name)
+				}
+			}
+			b.WriteByte('\t')
+			b.WriteString(name)
+			if len(ins.Args) > 0 {
+				b.WriteByte(' ')
+				b.WriteString(strings.Join(ins.Args, ", "))
+			}
+			b.WriteByte('\n')
+		}
+	}
 
 	// Script bodies.
 	for _, ins := range instrs {
@@ -57,7 +104,19 @@ func Emit(prog *Program, tgt target.GameTarget) string {
 		// are not base opcodes in scrcmd.json and are emitted as literal names.
 		macro := ins.Macro
 		if macro == "" {
-			macro = tgt.MacroName(ins.Opcode)
+			if prog.PretDialect {
+				if canonical, ok := tgt.(interface{ CanonicalOpcode(int) string }); ok {
+					macro = canonical.CanonicalOpcode(ins.Opcode)
+				}
+			}
+			if macro == "" {
+				macro = tgt.MacroName(ins.Opcode)
+			}
+		}
+		if prog.PretDialect {
+			if canonical, ok := tgt.(interface{ CanonicalMacro(string) string }); ok {
+				macro = canonical.CanonicalMacro(macro)
+			}
 		}
 		b.WriteByte('\t')
 		b.WriteString(macro)

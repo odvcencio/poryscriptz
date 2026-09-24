@@ -6,6 +6,7 @@ import (
 
 	gts "github.com/odvcencio/gotreesitter"
 	"github.com/odvcencio/gotreesitter/taproot"
+	"m31labs.dev/poryscriptz/target"
 	"m31labs.dev/poryscriptz/vocab"
 )
 
@@ -34,7 +35,7 @@ func movementArity(name string) (min, max int, ok bool) {
 	return 0, 0, false
 }
 
-func resolveMovement(w *taproot.Walker, n *gts.Node) (*Script, []Diag) {
+func resolveMovement(w *taproot.Walker, n *gts.Node, tgt target.GameTarget) (*Script, []Diag) {
 	s := &Script{Name: w.Text(w.Field(n, "name"))}
 	var diags []Diag
 	block := w.ChildByType(n, "block")
@@ -63,6 +64,9 @@ func resolveMovement(w *taproot.Walker, n *gts.Node) (*Script, []Diag) {
 			continue
 		}
 		min, max, ok := movementArity(name)
+		if me, exists := tgt.Macros().ByName(name); exists && me.Movement {
+			min, max, ok = me.MinArgs, len(me.Args), true
+		}
 		if !ok {
 			diags = append(diags, Diag{Line: line, Col: col, Msg: fmt.Sprintf("unknown movement macro %q", name)})
 			continue

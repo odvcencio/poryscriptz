@@ -3,14 +3,18 @@ package target
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"m31labs.dev/poryscriptz/vocab"
 )
 
 type hgss struct {
-	tbl    *vocab.Table
-	macros *vocab.MacroTable
+	tbl               *vocab.Table
+	macros            *vocab.MacroTable
+	defaultPret       bool
+	canonicalByOpcode map[int]string
+	canonicalByName   map[string]string
 }
 
 // HGSS loads the HGSS game target from scrcmdJSONPath.
@@ -18,17 +22,102 @@ type hgss struct {
 // scrcmdJSONPath; if that file does not exist, the macro table is empty
 // (all macros will be reported as unknown identifiers).
 func HGSS(scrcmdJSONPath string) (GameTarget, error) {
-	tbl, err := vocab.LoadScrcmdJSON(scrcmdJSONPath)
+	var tbl *vocab.Table
+	var err error
+	if scrcmdJSONPath == "" {
+		var data []byte
+		data, err = vocab.Bundled("scrcmd.json")
+		if err == nil {
+			tbl, err = vocab.ParseScrcmdJSON(data)
+		}
+	} else {
+		tbl, err = vocab.LoadScrcmdJSON(scrcmdJSONPath)
+	}
 	if err != nil {
 		return nil, err
 	}
-	macrosPath := filepath.Join(filepath.Dir(scrcmdJSONPath), "macros.json")
-	mt, err := vocab.LoadMacrosJSON(macrosPath)
+	var mt *vocab.MacroTable
+	if scrcmdJSONPath == "" {
+		data, e := vocab.Bundled("macros.json")
+		if e == nil {
+			mt, err = vocab.ParseMacrosJSON(data)
+		} else {
+			err = e
+		}
+	} else {
+		mt, err = vocab.LoadMacrosJSON(filepath.Join(filepath.Dir(scrcmdJSONPath), "macros.json"))
+	}
 	if err != nil {
 		// macros.json is optional; treat a missing file as an empty table.
 		mt = nil
 	}
-	return &hgss{tbl: tbl, macros: mt}, nil
+	var generated *vocab.MacroTable
+	if scrcmdJSONPath == "" {
+		data, e := vocab.Bundled("decomp_macros.json")
+		if e == nil {
+			generated, err = vocab.ParseMacrosJSON(data)
+		} else {
+			err = e
+		}
+	} else {
+		generated, err = vocab.LoadMacrosJSON(filepath.Join(filepath.Dir(scrcmdJSONPath), "decomp_macros.json"))
+	}
+	if err == nil {
+		if mt == nil {
+			mt = generated
+		} else {
+			for _, e := range generated.Entries() {
+				mt.Add(e)
+			}
+		}
+	}
+	if mt != nil {
+		for alias, raw := range map[string]string{"AsmGoto": "goto", "AsmReturn": "return", "AsmSwitch": "switch", "AsmCase": "case"} {
+			if entry, ok := mt.ByName(raw); ok {
+				copy := *entry
+				copy.Name, copy.EmitName = alias, raw
+				mt.Add(&copy)
+			}
+		}
+	}
+	h := &hgss{tbl: tbl, macros: mt, defaultPret: scrcmdJSONPath == "", canonicalByOpcode: map[int]string{}, canonicalByName: map[string]string{}}
+	entries := mt.Entries()
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	for _, e := range entries {
+		if e.Canonical != "" {
+			continue
+		}
+		normalized := strings.ToLower(strings.ReplaceAll(e.Name, "_", ""))
+		if _, exists := h.canonicalByName[normalized]; !exists {
+			h.canonicalByName[normalized] = e.Name
+		}
+		if e.Opcode != nil && !strings.HasPrefix(e.Name, "InitScript") {
+			if _, exists := h.canonicalByOpcode[*e.Opcode]; !exists {
+				h.canonicalByOpcode[*e.Opcode] = e.Name
+			}
+		}
+	}
+	return h, nil
+}
+
+func (h *hgss) DefaultPret() bool { return h.defaultPret }
+func (h *hgss) CanonicalMacro(name string) string {
+	if entry, ok := h.macros.ByName(name); ok && entry.Canonical != "" {
+		return entry.Canonical
+	}
+	if len(name) > 0 && name[0] >= 'A' && name[0] <= 'Z' {
+		return name
+	}
+	if canonical, ok := h.canonicalByName[strings.ToLower(strings.ReplaceAll(name, "_", ""))]; ok {
+		return canonical
+	}
+	return name
+}
+func (h *hgss) CanonicalOpcode(opcode int) string {
+	if name, ok := h.canonicalByOpcode[opcode]; ok {
+		return name
+	}
+	return h.CanonicalMacro(h.MacroName(opcode))
 }
 
 func (h *hgss) Name() string              { return "HGSS" }

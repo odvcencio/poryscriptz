@@ -21,17 +21,24 @@ type Diag struct {
 // Program is the resolved IR produced by Resolve. Sections preserve source
 // order; Scripts contains only the entry points written to the scrdef table.
 type Program struct {
-	Scripts  []*Script
-	Sections []Section
-	Includes []string
+	Scripts        []*Script
+	Sections       []Section
+	Includes       []string
+	Entries        []string
+	InitHeader     []Stmt
+	HasInitHeader  bool
+	PretDialect    bool
+	HasDialect     bool
+	ExtraTableEnds int
 }
 
 // Section is a script, a non-entry label, or a four-byte alignment directive.
 type Section struct {
-	Name     string
-	Stmts    []Stmt
-	Align    bool
-	Movement bool
+	Name          string
+	Stmts         []Stmt
+	Align         bool
+	Movement      bool
+	SourceInclude string
 }
 
 // Script is a resolved script declaration.
@@ -118,6 +125,9 @@ type Switch struct {
 // diagnostics (collect-and-continue; does not stop at the first error).
 func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program, []Diag) {
 	prog := &Program{}
+	if styled, ok := tgt.(interface{ DefaultPret() bool }); ok {
+		prog.PretDialect = styled.DefaultPret()
+	}
 	var diags []Diag
 	seenLabels := make(map[string]bool)
 
@@ -127,11 +137,46 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 			return
 		}
 		switch w.Type(n) {
+		case "table_end_declaration":
+			prog.ExtraTableEnds++
+			return
+		case "dialect_declaration":
+			prog.HasDialect = true
+			prog.PretDialect = strings.Contains(w.Text(n), "pret")
+			return
+		case "source_include_declaration":
+			literal := w.Text(w.Field(n, "path"))
+			header, err := includePath(literal)
+			if err != nil || !strings.HasSuffix(header, ".s") {
+				line, col := w.Pos(n)
+				diags = append(diags, Diag{Line: line, Col: col, Msg: "source: expected a relative .s path without traversal"})
+			} else {
+				prog.Sections = append(prog.Sections, Section{SourceInclude: header})
+			}
+			return
+		case "entries_declaration":
+			args := w.Field(n, "arguments")
+			for i := 0; args != nil && i < args.NamedChildCount(); i++ {
+				prog.Entries = append(prog.Entries, w.Text(args.NamedChild(i)))
+			}
+			return
+		case "init_header_declaration":
+			prog.HasInitHeader = true
+			block := w.ChildByType(n, "block")
+			if block != nil {
+				list := w.ChildByType(block, "statement_list")
+				if list != nil {
+					stmts, ds := resolveStmtList(w, list, tgt)
+					prog.InitHeader = append(prog.InitHeader, stmts...)
+					diags = append(diags, ds...)
+				}
+			}
+			return
 		case "script_declaration", "label_declaration", "movement_declaration":
 			var s *Script
 			var ds []Diag
 			if w.Type(n) == "movement_declaration" {
-				s, ds = resolveMovement(w, n)
+				s, ds = resolveMovement(w, n, tgt)
 			} else {
 				s, ds = resolveScript(w, n, tgt)
 			}
@@ -155,9 +200,9 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 			return
 		case "include_declaration":
 			header, err := includePath(w.Text(w.Field(n, "path")))
-			if err != nil {
+			if err != nil || !strings.HasSuffix(header, ".h") {
 				line, col := w.Pos(n)
-				diags = append(diags, Diag{Line: line, Col: col, Msg: err.Error()})
+				diags = append(diags, Diag{Line: line, Col: col, Msg: "include: expected a relative .h path without traversal"})
 			} else {
 				prog.Includes = append(prog.Includes, header)
 			}
@@ -186,7 +231,7 @@ func generatedLabelName(name string) bool {
 
 func includePath(literal string) (string, error) {
 	header, err := strconv.Unquote(literal)
-	if err != nil || !strings.HasSuffix(header, ".h") || path.IsAbs(header) ||
+	if err != nil || !(strings.HasSuffix(header, ".h") || strings.HasSuffix(header, ".s")) || path.IsAbs(header) ||
 		path.Clean(header) != header || strings.HasPrefix(header, "../") ||
 		strings.ContainsAny(header, "\\\r\n\"") {
 		return "", fmt.Errorf("include: expected a relative .h path without traversal")
@@ -578,11 +623,11 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 
 	// --- try macro table second ---
 	if me, ok := tgt.Macros().ByName(name); ok {
-		if gotArgCount != len(me.Args) {
+		if gotArgCount < me.MinArgs || gotArgCount > len(me.Args) {
 			diags = append(diags, Diag{
 				Line: line,
 				Col:  col,
-				Msg:  fmt.Sprintf("macro %s expects %d args, got %d", name, len(me.Args), gotArgCount),
+				Msg:  fmt.Sprintf("macro %s expects %d to %d args, got %d; check the command reference", name, me.MinArgs, len(me.Args), gotArgCount),
 			})
 			return nil, diags
 		}
@@ -593,7 +638,7 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 	diags = append(diags, Diag{
 		Line: line,
 		Col:  col,
-		Msg:  fmt.Sprintf("command %q not in %s vocabulary", name, tgt.Name()),
+		Msg:  fmt.Sprintf("command %q not in %s vocabulary; check spelling or run `poryz commands`", name, tgt.Name()),
 	})
 	return nil, diags
 }

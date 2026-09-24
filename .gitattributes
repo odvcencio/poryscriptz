@@ -1,0 +1,4 @@
+vocab/testdata/constants.json linguist-generated=true
+vocab/testdata/decomp_macros.json linguist-generated=true
+docs/command-reference.md linguist-generated=true
+language.bin binary
