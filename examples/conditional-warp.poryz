@@ -1,0 +1,8 @@
+package m
+
+script Event {
+    if flag(FLAG_UNK_042) {
+        warp_to(MAP_ROUTE_1, 0, 1, 1, DIR_SOUTH)
+    }
+    End()
+}

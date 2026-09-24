@@ -1,0 +1,9 @@
+package cf
+script S_ifelse {
+	if flag(FLAG_NOTHING) {
+		setflag(FLAG_NOTHING)
+	} else {
+		clearflag(FLAG_NOTHING)
+	}
+	end()
+}

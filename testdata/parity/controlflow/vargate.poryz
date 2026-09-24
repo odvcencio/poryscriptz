@@ -1,0 +1,7 @@
+package cf
+script S_vargate {
+	if var(VAR_TEMP_x4000) == 3 {
+		end()
+	}
+	end()
+}

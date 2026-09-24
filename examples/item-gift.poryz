@@ -1,0 +1,13 @@
+package m
+
+script Event {
+    LockAll()
+    give_item(ITEM_POTION, 1, _BagFull)
+    ReleaseAll()
+    End()
+}
+label _BagFull {
+    CallStd(std_bag_is_full)
+    ReleaseAll()
+    End()
+}

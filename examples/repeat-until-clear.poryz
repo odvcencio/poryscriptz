@@ -1,0 +1,9 @@
+package m
+
+script Event {
+    for flag(FLAG_UNK_042) {
+        message(0)
+        flag_clear(FLAG_UNK_042)
+    }
+    End()
+}

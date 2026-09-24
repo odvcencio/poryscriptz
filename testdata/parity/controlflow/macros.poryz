@@ -1,0 +1,20 @@
+package cf
+// MacrosAssembleClean: exercises script.inc macro vocabulary.
+// Movement data is tested in movement.poryz.
+script S_macros {
+	lockall()
+	faceplayer()
+	trainer_battle(1, 0, 0, 0)
+	check_battle_won(VAR_TEMP_x4000)
+	npc_msg(1)
+	closemsg()
+	giveitem_no_check(ITEM_POTION, 1)
+	give_mon(SPECIES_PIKACHU, 5, 0, 0, 0, VAR_TEMP_x4000)
+	buffer_players_name(0)
+	play_se(1)
+	check_badge(BADGE_ZEPHYR, VAR_TEMP_x4000)
+	releaseall()
+	warp(MAP_PALLET, 0, 0, 0, 0)
+	warp(MAP_PALLET_TOWN_OAKS_LAB, 0, 8, 11, DIR_SOUTH)
+	end()
+}

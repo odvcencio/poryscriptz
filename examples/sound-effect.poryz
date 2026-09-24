@@ -1,0 +1,7 @@
+package m
+
+script Event {
+    PlaySE(SEQ_SE_DP_SELECT)
+    message(0)
+    End()
+}

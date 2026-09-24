@@ -1,0 +1,15 @@
+package m
+
+script MoveAndWait {
+	move_actor_and_wait(0, _Walk)
+	end()
+}
+
+movement _Walk {
+	WalkNormalNorth(2)
+	JumpFarEast(2)
+	Delay16(2)
+	EmoteExclamationMark(2)
+	SetVisible(2)
+	EndMovement()
+}

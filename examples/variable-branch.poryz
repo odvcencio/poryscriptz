@@ -1,0 +1,11 @@
+package m
+
+script Event {
+    if_var_eq(VAR_TEMP_x4000, 1, _Yes)
+    message(0)
+    End()
+}
+label _Yes {
+    message(1)
+    End()
+}

@@ -1,0 +1,26 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef TrainerScript
+	scrdef MovementScript
+	scrdef_end
+TrainerScript:
+	lockall
+	faceplayer
+	trainer_battle 900, 0, 0, 0
+	check_battle_won VAR_RESULT
+	npc_msg 5
+	closemsg
+	giveitem_no_check ITEM_POTION, 1
+	give_mon SPECIES_PIKACHU, 5, 0, 0, 0, 0
+	buffer_players_name 0
+	play_se SE_FANFARE
+	check_badge BADGE_ZEPHYR, VAR_RESULT
+	releaseall
+	end
+MovementScript:
+	apply_movement 0, MyMovement
+	wait_movement
+	warp MAP_PALLET_TOWN, 0, WARP_LAST_USED, 0, 0
+	end

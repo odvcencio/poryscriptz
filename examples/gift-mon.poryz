@@ -1,0 +1,6 @@
+package m
+
+script Event {
+    GiveMon(SPECIES_PIKACHU, 5, ITEM_NONE, 0, 0, VAR_SPECIAL_RESULT)
+    End()
+}

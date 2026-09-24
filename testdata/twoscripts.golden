@@ -1,0 +1,17 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef ScriptA
+	scrdef ScriptB
+	scrdef_end
+ScriptA:
+	goto_if_unset FLAG_A, _L0
+	end
+_L0:
+	end
+ScriptB:
+	goto_if_unset FLAG_B, _L1
+	end
+_L1:
+	end

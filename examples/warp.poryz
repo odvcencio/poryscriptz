@@ -1,0 +1,6 @@
+package m
+
+script Event {
+    warp_to(MAP_ROUTE_1, 0, 1, 1, DIR_SOUTH)
+    End()
+}

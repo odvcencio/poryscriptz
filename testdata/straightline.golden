@@ -1,0 +1,9 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef Greeter
+	scrdef_end
+Greeter:
+	setflag FLAG_X
+	end

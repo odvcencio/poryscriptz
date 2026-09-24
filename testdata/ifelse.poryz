@@ -1,0 +1,9 @@
+package m
+script S {
+	if flag(FLAG_X) {
+		setflag(FLAG_A)
+	} else {
+		setflag(FLAG_B)
+	}
+	end()
+}

@@ -1,0 +1,6 @@
+editors/vscode/node_modules/
+editors/vscode/dist/
+/dist/
+*.vsix
+
+/genblob

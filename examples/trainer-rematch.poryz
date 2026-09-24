@@ -1,0 +1,11 @@
+package m
+
+script Event {
+    if flag(FLAG_UNK_042) {
+        message(1)
+        End()
+    }
+    trainer_battle_simple(TRAINER_YOUNGSTER_JOEY)
+    flag_set(FLAG_UNK_042)
+    End()
+}

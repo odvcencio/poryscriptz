@@ -1,0 +1,10 @@
+package m
+
+script Event {
+    if flag(FLAG_UNK_042) {
+        message(1)
+    } else {
+        message(0)
+    }
+    End()
+}

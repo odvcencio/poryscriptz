@@ -1,0 +1,22 @@
+#include "constants/scrcmd.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef S
+	scrdef_end
+S:
+	compare_var_to_value VAR_X, 1
+	goto_if_eq _L0
+	compare_var_to_value VAR_X, 2
+	goto_if_eq _L1
+	goto _L2
+_L0:
+	setflag FLAG_A
+	goto _L3
+_L1:
+	setflag FLAG_B
+	goto _L3
+_L2:
+	end
+_L3:
+	end

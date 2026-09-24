@@ -1,0 +1,35 @@
+package m
+
+include "fielddata/script/scr_seq/event_D02R0103.h"
+include "msgdata/msg/msg_0051_D02R0104.h"
+
+script Event {
+	message(msg_0051_D02R0104_00010)
+	say(msg_0051_D02R0104_00009)
+	trainer_battle_simple(TRAINER_LEADER_BROCK_BROCK)
+	give_item(ITEM_DOME_FOSSIL, 1, _BagFull)
+	move_actor(obj_player, _Move)
+	move_actor_and_wait(241, _Move)
+	flag_set(FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS)
+	flag_clear(FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS)
+	var_set(VAR_SPECIAL_x8004, 1)
+	var_copy(VAR_SPECIAL_x8005, VAR_SPECIAL_x8004)
+	warp_to(MAP_MOUNT_MOON_SQUARE, 0, 34, 23, DIR_SOUTH)
+	if_flag_set(FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS, _Done)
+	if_flag_unset(FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS, _Done)
+	if_var_eq(VAR_SPECIAL_x8004, 1, _Done)
+	if_var_ne(VAR_SPECIAL_x8004, 0, _Done)
+	end()
+}
+
+label _BagFull {
+	callstd(std_bag_is_full)
+	end()
+}
+
+label _Done {}
+movement _Move {
+	WalkNormalNorth(2)
+	EndMovement()
+}
+align4()

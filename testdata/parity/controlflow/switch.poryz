@@ -1,0 +1,12 @@
+package cf
+script S_switch {
+	switch var(VAR_TEMP_x4000) {
+	case 1:
+		setflag(FLAG_NOTHING)
+	case 2:
+		clearflag(FLAG_NOTHING)
+	default:
+		end()
+	}
+	end()
+}

@@ -1,0 +1,7 @@
+package m
+script S {
+	for flag(FLAG_X) {
+		setflag(FLAG_A)
+	}
+	end()
+}

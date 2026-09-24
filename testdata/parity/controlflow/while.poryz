@@ -1,0 +1,7 @@
+package cf
+script S_while {
+	for flag(FLAG_NOTHING) {
+		setflag(FLAG_NOTHING)
+	}
+	end()
+}

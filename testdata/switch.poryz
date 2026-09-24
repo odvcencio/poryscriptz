@@ -1,0 +1,12 @@
+package m
+script S {
+	switch var(VAR_X) {
+	case 1:
+		setflag(FLAG_A)
+	case 2:
+		setflag(FLAG_B)
+	default:
+		end()
+	}
+	end()
+}

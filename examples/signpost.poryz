@@ -1,0 +1,8 @@
+package m
+
+script Event {
+    message(0)
+    WaitButton()
+    CloseMsg()
+    End()
+}

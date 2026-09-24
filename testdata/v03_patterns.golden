@@ -1,0 +1,39 @@
+#include "constants/scrcmd.h"
+#include "fielddata/script/scr_seq/event_D02R0103.h"
+#include "msgdata/msg/msg_0051_D02R0104.h"
+.include "asm/macros/script.inc"
+
+.rodata
+	scrdef Event
+	scrdef_end
+Event:
+	npc_msg msg_0051_D02R0104_00010
+	npc_msg msg_0051_D02R0104_00009
+	closemsg
+	trainer_battle TRAINER_LEADER_BROCK_BROCK, 0, 0, 0
+	goto_if_no_item_space ITEM_DOME_FOSSIL, 1, _BagFull
+	callstd std_give_item_verbose
+	apply_movement obj_player, _Move
+	apply_movement 241, _Move
+	wait_movement
+	setflag FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS
+	clearflag FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS
+	setvar VAR_SPECIAL_x8004, 1
+	copyvar VAR_SPECIAL_x8005, VAR_SPECIAL_x8004
+	warp MAP_MOUNT_MOON_SQUARE, 0, 34, 23, DIR_SOUTH
+	goto_if_set FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS, _Done
+	goto_if_unset FLAG_HIDE_ITEMBALL_D02R0103_FOSSILS, _Done
+	compare_var_to_value VAR_SPECIAL_x8004, 1
+	goto_if_eq _Done
+	compare_var_to_value VAR_SPECIAL_x8004, 0
+	goto_if_ne _Done
+	end
+_BagFull:
+	callstd std_bag_is_full
+	end
+_Done:
+	.balign 4, 0
+_Move:
+	WalkNormalNorth 2
+	EndMovement
+	.balign 4, 0

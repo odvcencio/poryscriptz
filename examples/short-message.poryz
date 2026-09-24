@@ -1,0 +1,6 @@
+package m
+
+script Event {
+    say(0)
+    End()
+}
