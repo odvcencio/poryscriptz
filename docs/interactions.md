@@ -1,6 +1,7 @@
 # NPC interactions
 
-Build this branch from source to use these additive HGSS helpers. The published
+These helpers are for non-player characters (NPCs) in HeartGold and SoulSilver
+(HGSS). Build this branch from source to use them. The published
 v0.3.0 binary predates them. Existing source and raw scripts keep their behavior.
 
 ## A readable greeting
