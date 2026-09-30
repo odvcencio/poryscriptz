@@ -6,6 +6,7 @@ These calls save a few common steps. They use the same script macros as direct c
 | --- | --- |
 | `message(id)` | Open a message box. |
 | `say(id)` | Open and close a message box. Add a wait when the player must read it first. |
+| `dialogue(id)` | Display a message, wait for a button, then close it. |
 | `trainer_battle_simple(trainer)` | Start a basic trainer battle. Check the result before a win event. |
 | `give_item(item, count, bagFullLabel)` | Check bag space, then give an item. Define the full bag label. |
 | `move_actor(actor, path)` | Start a movement path. |
@@ -36,3 +37,5 @@ movement _Walk {
 ```
 
 Use `poryz commands` to find direct macros. The [cookbook](cookbook.md) shows complete files with these patterns.
+
+For an NPC talk entry, [managed interactions](interactions.md) handle locking, facing, and cleanup. `if ask(id)` displays a Yes/No prompt and selects the Yes branch without exposing scratch variables or numeric menu results. These additions require a source build from this branch; v0.3.0 keeps its existing behavior.

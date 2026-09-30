@@ -31,7 +31,7 @@ func TestPublishedExamplesCompile(t *testing.T) {
 			assertCompiles(t, src, tgt)
 		})
 	}
-	docs := []string{"README.md", "docs/first-script.md", "docs/cookbook.md", "docs/patterns.md"}
+	docs := []string{"README.md", "docs/first-script.md", "docs/cookbook.md", "docs/patterns.md", "docs/interactions.md"}
 	for _, file := range docs {
 		data, err := os.ReadFile(file)
 		if err != nil {

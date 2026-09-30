@@ -85,7 +85,7 @@ func (PatternCall) isStmt() {}
 // For an "else if" chain, Else contains a single If stmt; for a plain "else { … }"
 // it contains the block's resolved statements.
 type If struct {
-	Kind  string // "flag" or "vareq"
+	Kind  string // "flag", "vareq", or HGSS "ask"
 	Flag  string // Kind=="flag": identifier text, e.g. "FLAG_X"
 	Var   string // Kind=="vareq": var identifier text, e.g. "VAR_X"
 	Value string // Kind=="vareq": literal text, e.g. "3"
@@ -137,6 +137,13 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 			return
 		}
 		switch w.Type(n) {
+		case "source_file":
+			for i := 0; i < n.NamedChildCount(); i++ {
+				walk(n.NamedChild(i))
+			}
+			return
+		case "package_clause", "comment":
+			return
 		case "table_end_declaration":
 			prog.ExtraTableEnds++
 			return
@@ -172,11 +179,13 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 				}
 			}
 			return
-		case "script_declaration", "label_declaration", "movement_declaration":
+		case "script_declaration", "interaction_declaration", "label_declaration", "movement_declaration":
 			var s *Script
 			var ds []Diag
 			if w.Type(n) == "movement_declaration" {
 				s, ds = resolveMovement(w, n, tgt)
+			} else if w.Type(n) == "interaction_declaration" {
+				s, ds = resolveInteraction(w, n, tgt)
 			} else {
 				s, ds = resolveScript(w, n, tgt)
 			}
@@ -190,7 +199,7 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 				diags = append(diags, Diag{Line: line, Col: col, Msg: fmt.Sprintf("duplicate label %q", s.Name)})
 			}
 			seenLabels[s.Name] = true
-			if w.Type(n) == "script_declaration" {
+			if w.Type(n) == "script_declaration" || w.Type(n) == "interaction_declaration" {
 				prog.Scripts = append(prog.Scripts, s)
 			}
 			prog.Sections = append(prog.Sections, Section{Name: s.Name, Stmts: s.Stmts, Movement: w.Type(n) == "movement_declaration"})
@@ -207,9 +216,9 @@ func Resolve(w *taproot.Walker, root *gts.Node, tgt target.GameTarget) (*Program
 				prog.Includes = append(prog.Includes, header)
 			}
 			return
-		}
-		for i := 0; i < n.ChildCount(); i++ {
-			walk(n.Child(i))
+		default:
+			line, col := w.Pos(n)
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported top-level declaration: " + w.Type(n)})
 		}
 	}
 	walk(root)
@@ -269,13 +278,17 @@ func resolveStmtList(w *taproot.Walker, stmtList *gts.Node, tgt target.GameTarge
 	var stmts []Stmt
 	var diags []Diag
 
-	for i := 0; i < stmtList.ChildCount(); i++ {
-		child := stmtList.Child(i)
+	for i := 0; i < stmtList.NamedChildCount(); i++ {
+		child := stmtList.NamedChild(i)
 		switch w.Type(child) {
+		case "comment":
+			continue
 		case "expression_statement":
 			// The call_expression is the only child of expression_statement.
 			callExpr := w.ChildByType(child, "call_expression")
 			if callExpr == nil {
+				line, col := w.Pos(child)
+				diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported statement: expected a command or helper call"})
 				continue
 			}
 			stmt, ds := resolveCall(w, callExpr, tgt)
@@ -301,6 +314,9 @@ func resolveStmtList(w *taproot.Walker, stmtList *gts.Node, tgt target.GameTarge
 			if stmt != nil {
 				stmts = append(stmts, stmt)
 			}
+		default:
+			line, col := w.Pos(child)
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported statement: " + w.Type(child) + "; use explicit script commands for control flow"})
 		}
 	}
 	return stmts, diags
@@ -315,6 +331,10 @@ func resolveStmtList(w *taproot.Walker, stmtList *gts.Node, tgt target.GameTarge
 // Any other shape emits an "unsupported if-condition" diagnostic and returns nil.
 func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt, []Diag) {
 	var diags []Diag
+	if initializer := w.Field(ifNode, "initializer"); initializer != nil {
+		line, col := w.Pos(initializer)
+		return nil, []Diag{{Line: line, Col: col, Msg: "unsupported if initializer: statements before the condition are not supported"}}
+	}
 
 	condNode := w.Field(ifNode, "condition")
 	conseqNode := w.Field(ifNode, "consequence")
@@ -327,8 +347,16 @@ func resolveIf(w *taproot.Walker, ifNode *gts.Node, tgt target.GameTarget) (Stmt
 	case "call_expression":
 		// flag(<IDENT>) condition
 		funcNode := w.Field(condNode, "function")
+		if w.Text(funcNode) == "ask" {
+			value, ds := resolveAsk(w, condNode, tgt)
+			if len(ds) > 0 {
+				return nil, ds
+			}
+			result = If{Kind: "ask", Value: value}
+			break
+		}
 		if w.Text(funcNode) != "flag" {
-			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported if-condition: only flag() and var()==N supported"})
+			diags = append(diags, Diag{Line: line, Col: col, Msg: "unsupported if-condition: use flag(), var()==N, or HGSS ask(message)"})
 			return nil, diags
 		}
 		argList := w.Field(condNode, "arguments")
@@ -592,6 +620,14 @@ func resolveCall(w *taproot.Walker, callExpr *gts.Node, tgt target.GameTarget) (
 	funcNode := w.Field(callExpr, "function")
 	name := w.Text(funcNode)
 	line, col := w.Pos(funcNode)
+	if name == "ask" {
+		return nil, []Diag{{Line: line, Col: col, Msg: "ask(message) is a predicate: use `if ask(message) { ... } else { ... }`"}}
+	}
+	if name == "dialogue" && tgt.Name() == "HGSS" {
+		if ds := requireHGSSCommands(tgt, []string{"npc_msg", "WaitButton", "closemsg"}, line, col); len(ds) > 0 {
+			return nil, ds
+		}
+	}
 
 	// Collect raw args (shared by both resolution paths).
 	argList := w.Field(callExpr, "arguments")

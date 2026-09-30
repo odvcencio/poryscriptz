@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,22 +21,38 @@ import (
 type result struct{ file, class, detail string }
 
 func main() {
-	decomp := flag.String("decomp", "", "public decomp root")
-	hack := flag.String("hack", "", "hack scr_seq directory")
-	hackRoot := flag.String("hack-root", "", "decomp root with hack macros and headers")
-	mwas := flag.String("mwas", "", "mwasmarm.exe path")
-	headers := flag.String("headers", "", "extra generated header files root")
-	vocabulary := flag.String("vocab", "vocab/testdata/scrcmd.json", "scrcmd.json path")
-	workers := flag.Int("workers", 6, "parallel assembler processes")
-	flag.Parse()
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr, check))
+}
+
+type checker func(file, root, mwas, headers string, tgt target.GameTarget) result
+
+func run(args []string, stdout, stderr io.Writer, checkFile checker) int {
+	flags := flag.NewFlagSet("roundtrip", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	decomp := flags.String("decomp", "", "public decomp root")
+	hack := flags.String("hack", "", "hack scr_seq directory")
+	hackRoot := flags.String("hack-root", "", "decomp root with hack macros and headers")
+	mwas := flags.String("mwas", "", "mwasmarm.exe path")
+	headers := flags.String("headers", "", "extra generated header files root")
+	vocabulary := flags.String("vocab", "vocab/testdata/scrcmd.json", "scrcmd.json path")
+	workers := flags.Int("workers", 6, "parallel assembler processes")
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
 	if *decomp == "" || *mwas == "" {
-		fmt.Fprintln(os.Stderr, "usage: roundtrip -decomp ROOT -mwas EXE [-headers FILES_ROOT] [-hack SCRIPTS -hack-root ROOT]")
-		os.Exit(2)
+		fmt.Fprintln(stderr, "usage: roundtrip -decomp ROOT -mwas EXE [-headers FILES_ROOT] [-hack SCRIPTS -hack-root ROOT]")
+		return 2
+	}
+	if *workers < 1 || flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "roundtrip: workers must be >= 1 and positional arguments are not supported")
+		return 2
 	}
 	tgt, err := target.HGSS(*vocabulary)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(stderr, "roundtrip: load vocabulary: %v\n", err)
+		return 2
 	}
+	failed := false
 	for _, set := range []struct{ name, folder, root string }{{"pret", filepath.Join(*decomp, "files/fielddata/script/scr_seq"), *decomp}, {"hack", *hack, *hackRoot}} {
 		if set.folder == "" {
 			continue
@@ -45,7 +62,14 @@ func main() {
 		}
 		files, err := filepath.Glob(filepath.Join(set.folder, "*.s"))
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(stderr, "%s: list corpus: %v\n", set.name, err)
+			failed = true
+			continue
+		}
+		if len(files) == 0 {
+			fmt.Fprintf(stderr, "%s: empty corpus: expected .s files in %s\n", set.name, set.folder)
+			failed = true
+			continue
 		}
 		jobs := make(chan string)
 		results := make(chan result, len(files))
@@ -55,7 +79,7 @@ func main() {
 			go func() {
 				defer wg.Done()
 				for file := range jobs {
-					results <- check(file, set.root, *mwas, *headers, tgt)
+					results <- checkFile(file, set.root, *mwas, *headers, tgt)
 				}
 			}()
 		}
@@ -74,7 +98,10 @@ func main() {
 				classes[r.class] = append(classes[r.class], r)
 			}
 		}
-		fmt.Printf("%s: %d/%d byte-identical\n", set.name, pass, len(files))
+		if pass != len(files) {
+			failed = true
+		}
+		fmt.Fprintf(stdout, "%s: %d/%d byte-identical\n", set.name, pass, len(files))
 		keys := make([]string, 0, len(classes))
 		for k := range classes {
 			keys = append(keys, k)
@@ -82,12 +109,16 @@ func main() {
 		sort.Strings(keys)
 		for _, k := range keys {
 			sort.Slice(classes[k], func(i, j int) bool { return classes[k][i].file < classes[k][j].file })
-			fmt.Printf("  %s: %d\n", k, len(classes[k]))
+			fmt.Fprintf(stdout, "  %s: %d\n", k, len(classes[k]))
 			for _, r := range classes[k] {
-				fmt.Printf("    %s: %s\n", filepath.Base(r.file), r.detail)
+				fmt.Fprintf(stdout, "    %s: %s\n", filepath.Base(r.file), r.detail)
 			}
 		}
 	}
+	if failed {
+		return 1
+	}
+	return 0
 }
 
 func check(file, root, mwas, headers string, tgt target.GameTarget) result {

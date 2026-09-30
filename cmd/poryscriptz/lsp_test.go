@@ -6,11 +6,43 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/odvcencio/poryscriptz/target"
 )
 
 func lspFrame(v any) string {
 	b, _ := json.Marshal(v)
 	return fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(b), b)
+}
+
+func TestLSPManagedEventHelpers(t *testing.T) {
+	s, err := target.HGSS("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &lspServer{target: s}
+	for _, word := range []string{"interaction", "dialogue", "ask"} {
+		if server.hover(word) == nil {
+			t.Fatalf("missing hover for %s", word)
+		}
+		items := completion(word[:3]).([]any)
+		found := false
+		for _, item := range items {
+			if item.(map[string]any)["label"] == word {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("missing completion for %s", word)
+		}
+	}
+	doc := lspDoc{URI: "file:///tmp/event.poryz", Text: "package m\ninteraction Greeting { dialogue(MSG_GREETING) }\n"}
+	if definition(doc, "Greeting") == nil {
+		t.Fatal("interaction entry missing from navigation")
+	}
+	if len(semanticTokens(doc.Text)) == 0 {
+		t.Fatal("interaction missing syntax highlights")
+	}
 }
 func TestLSPDiagnosticsNavigationAndHighlight(t *testing.T) {
 	source := "package m\nscript Start {\n    GoTo(_Done)\n}\nlabel _Done {\n    End()\n}\n"
@@ -37,6 +69,8 @@ func TestLSPDiagnosticsNavigationAndHighlight(t *testing.T) {
 			t.Errorf("response missing %q", want)
 		}
 	}
-	items:=completion("ITEM_PO").([]any)
-	if len(items)==0 {t.Fatal("constant completion returned no items")}
+	items := completion("ITEM_PO").([]any)
+	if len(items) == 0 {
+		t.Fatal("constant completion returned no items")
+	}
 }
