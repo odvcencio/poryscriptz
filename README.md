@@ -30,19 +30,15 @@ Build your decomp with its normal build command. The generated `.s` file uses th
 ```poryz
 package m
 
-script FirstTalk {
-    LockAll()
-    FacePlayer()
-    NPCMsg(0)
-    WaitButton()
-    CloseMsg()
-    ReleaseAll()
-    End()
+interaction FirstTalk {
+    dialogue(0)
 }
 align4()
 ```
 
-`script` adds one entry to the script table. `NPCMsg(0)` uses message ID 0. Use an ID from the message file for your map. `align4()` keeps the end of the file aligned for the assembler. The file above compiles without extra setup; see [`examples/npc-dialogue.poryz`](examples/npc-dialogue.poryz) for a checked copy.
+`interaction` adds an NPC talk entry: lock actors, face the player, run the body, release actors, and end. `dialogue(0)` displays message 0, waits for input, and closes it. Use an ID from your map's message bank; existing `MSG_`/`msg_` symbols work too when their header is included. `align4()` keeps the end aligned for the assembler. See [`examples/npc-dialogue.poryz`](examples/npc-dialogue.poryz) and the [NPC interaction guide](docs/interactions.md).
+
+These helpers are available when building this branch from source; the published v0.3.0 binary predates them. Raw `script` blocks, macros, and the default decompiler remain available. The existing `say(id)` helper still closes immediately without a button wait.
 
 ## Install
 

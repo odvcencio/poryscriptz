@@ -9,21 +9,15 @@ Save this as `hello.poryz`:
 ```poryz
 package m
 
-script Hello {
-    LockAll()
-    FacePlayer()
-    NPCMsg(0)
-    WaitButton()
-    CloseMsg()
-    ReleaseAll()
-    End()
+interaction Hello {
+    dialogue(0)
 }
 align4()
 ```
 
-`package m` marks the file as poryz source. `script Hello` adds a script table entry named `Hello`. Each call runs one command. The braces show where the script starts and ends.
+Build this branch from source for the interaction helpers; the published v0.3.0 binary does not have them yet.
 
-`LockAll()` keeps the player in place. `FacePlayer()` turns the NPC. `NPCMsg(0)` opens message 0 from the map's message file. `WaitButton()` waits for a button. `CloseMsg()` closes the box. `ReleaseAll()` gives control back. `End()` stops the script.
+`package m` marks the file as poryz source. `interaction Hello` adds an NPC talk entry named `Hello`, keeps actors in place, and faces the player. `dialogue(0)` opens message 0 from the map's message bank, waits for a button, and closes the box. The interaction then gives control back and stops. Use a raw `script` for other kinds of map triggers or manual command sequences.
 
 ## 2. Check and compile it
 
@@ -51,16 +45,13 @@ Use a flag when the NPC should say something else after an event:
 ```poryz
 package m
 
-script Hello {
+interaction Hello {
     if flag(FLAG_UNK_042) {
-        NPCMsg(1)
+        dialogue(1)
     } else {
-        NPCMsg(0)
-        SetFlag(FLAG_UNK_042)
+        dialogue(0)
+        flag_set(FLAG_UNK_042)
     }
-    WaitButton()
-    CloseMsg()
-    End()
 }
 ```
 

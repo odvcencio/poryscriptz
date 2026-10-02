@@ -1,0 +1,14 @@
+package m
+
+// These IDs refer to messages already authored in this map's message bank.
+interaction Offer {
+    if flag(FLAG_UNK_042) {
+        dialogue(3)
+    } else if ask(0) {
+        dialogue(1)
+        flag_set(FLAG_UNK_042)
+    } else {
+        dialogue(2)
+    }
+}
+align4()

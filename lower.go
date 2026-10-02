@@ -95,13 +95,7 @@ func (c *lowerCtx) lowerIf(st If) {
 	if len(st.Else) == 0 {
 		// No else — v0.1 single-skip-label behaviour.
 		skipLabel := c.nextLabel()
-		switch st.Kind {
-		case "flag":
-			c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, skipLabel}})
-		case "vareq":
-			c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
-			c.append(Instr{Macro: "goto_if_ne", Args: []string{skipLabel}})
-		}
+		c.lowerFalseBranch(st, skipLabel)
 		c.lowerStmts(st.Body)
 		c.append(Instr{Label: skipLabel, Opcode: -1})
 		return
@@ -112,13 +106,7 @@ func (c *lowerCtx) lowerIf(st If) {
 	lelse := c.nextLabel()
 	lend := c.nextLabel()
 
-	switch st.Kind {
-	case "flag":
-		c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, lelse}})
-	case "vareq":
-		c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
-		c.append(Instr{Macro: "goto_if_ne", Args: []string{lelse}})
-	}
+	c.lowerFalseBranch(st, lelse)
 	c.lowerStmts(st.Body)
 	// Unconditional jump past the else-body.
 	c.append(Instr{Macro: "goto", Args: []string{lend}})
@@ -127,6 +115,25 @@ func (c *lowerCtx) lowerIf(st If) {
 	c.lowerStmts(st.Else)
 	// End label sentinel.
 	c.append(Instr{Label: lend, Opcode: -1})
+}
+
+func (c *lowerCtx) lowerFalseBranch(st If, label string) {
+	switch st.Kind {
+	case "flag":
+		c.append(Instr{Macro: "goto_if_unset", Args: []string{st.Flag, label}})
+	case "vareq":
+		c.append(Instr{Macro: "compare_var_to_value", Args: []string{st.Var, st.Value}})
+		c.append(Instr{Macro: "goto_if_ne", Args: []string{label}})
+	case "ask":
+		c.append(patternInstr("npc_msg", st.Value))
+		c.append(patternInstr("yesno", "VAR_SPECIAL_RESULT"))
+		c.append(patternInstr("closemsg"))
+		// HGSS sub_020416E4 writes 0 for Yes, 1 for No (including B cancel).
+		c.append(patternInstr("compare_var_to_value", "VAR_SPECIAL_RESULT", "0"))
+		c.append(patternInstr("goto_if_ne", label))
+	default:
+		panic("unknown resolved if condition: " + st.Kind)
+	}
 }
 
 // lowerWhile lowers a While statement into a top-test loop:

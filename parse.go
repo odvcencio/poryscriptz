@@ -28,7 +28,7 @@ func firstScriptName(w *taproot.Walker, root *gts.Node) string {
 		if n == nil || found != "" {
 			return
 		}
-		if w.Type(n) == "script_declaration" {
+		if w.Type(n) == "script_declaration" || w.Type(n) == "interaction_declaration" {
 			found = w.Text(w.Field(n, "name"))
 			return
 		}

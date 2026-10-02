@@ -31,6 +31,7 @@ const (
 var patternArgs = map[string][]patternArg{
 	"message":               {messageID},
 	"say":                   {messageID},
+	"dialogue":              {messageID},
 	"trainer_battle_simple": {trainerID},
 	"give_item":             {itemID, giftQuantity, labelID},
 	"move_actor":            {actorID, labelID},
@@ -200,6 +201,10 @@ func expandPattern(name string, args []string) []Instr {
 		return []Instr{patternInstr("npc_msg", args[0])}
 	case "say":
 		return []Instr{patternInstr("npc_msg", args[0]), patternInstr("closemsg")}
+	case "dialogue":
+		// The legacy vocabulary's wait_button is opcode 49 (WaitABPress).
+		// Native WaitButton is opcode 50 and also accepts directional input.
+		return []Instr{patternInstr("npc_msg", args[0]), patternInstr("WaitButton"), patternInstr("closemsg")}
 	case "trainer_battle_simple":
 		return []Instr{patternInstr("trainer_battle", args[0], "0", "0", "0")}
 	case "give_item":

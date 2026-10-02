@@ -349,6 +349,9 @@ func (s *lspServer) hover(word string) any {
 	if word == "" {
 		return nil
 	}
+	if doc, ok := eventHelperDocs[word]; ok {
+		return map[string]any{"contents": map[string]string{"kind": "markdown", "value": doc}}
+	}
 	if m, ok := s.target.Macros().ByName(word); ok {
 		params := m.Params
 		if len(params) == 0 && len(m.Args) > 0 {
@@ -387,7 +390,7 @@ func definition(doc lspDoc, word string) any {
 			return
 		}
 		switch w.Type(n) {
-		case "script_declaration", "label_declaration", "movement_declaration":
+		case "script_declaration", "interaction_declaration", "label_declaration", "movement_declaration":
 			name := w.Field(n, "name")
 			if w.Text(name) == word {
 				line, col := w.Pos(name)
@@ -418,5 +421,16 @@ func completion(prefix string) any {
 		}
 		items = append(items, map[string]any{"label": c.Name, "kind": 21, "detail": c.Kind + " = " + c.Value})
 	}
+	for _, name := range []string{"interaction", "dialogue", "ask"} {
+		if strings.HasPrefix(name, prefix) {
+			items = append(items, map[string]any{"label": name, "kind": 3, "detail": "HGSS NPC event helper"})
+		}
+	}
 	return items
+}
+
+var eventHelperDocs = map[string]string{
+	"interaction": "`interaction Name { ... }`\n\nHGSS NPC talk entry. Locks actors, faces the player, runs checked helpers and if/else, then releases actors and ends. Raw commands and loops require a `script`.",
+	"dialogue":    "`dialogue(message)`\n\nHGSS NPCMsg, WaitButton, CloseMsg. Uses an 8-bit message ID or MSG_/msg_ symbol from the map's message bank. Does not acquire or release locks by itself.",
+	"ask":         "`if ask(message) { ... } else { ... }`\n\nHGSS NPCMsg, YesNo, CloseMsg. True for Yes (engine result 0); No and B cancellation are false. Clobbers VAR_SPECIAL_RESULT. Predicate only.",
 }

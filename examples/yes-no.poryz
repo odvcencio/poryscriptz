@@ -2,7 +2,7 @@ package m
 
 script Event {
     YesNo(VAR_SPECIAL_RESULT)
-    Compare(VAR_SPECIAL_RESULT, 1)
+    Compare(VAR_SPECIAL_RESULT, 0)
     GoToIfEq(_Yes)
     message(0)
     End()

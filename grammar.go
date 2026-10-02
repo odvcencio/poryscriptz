@@ -30,6 +30,11 @@ func PoryscriptZGrammar() *Grammar {
 			gg.Field("name", gg.Sym("identifier")),
 			gg.Sym("block"),
 		))
+		g.Define("interaction_declaration", gg.Seq(
+			gg.Str("interaction"),
+			gg.Field("name", gg.Sym("identifier")),
+			gg.Sym("block"),
+		))
 		g.Define("movement_declaration", gg.Seq(
 			gg.Str("movement"),
 			gg.Field("name", gg.Sym("identifier")),
@@ -54,7 +59,7 @@ func PoryscriptZGrammar() *Grammar {
 		g.Define("dialect_declaration", gg.Seq(gg.Str("dialect"), gg.Choice(gg.Str("pret"), gg.Str("legacy"))))
 		g.Define("table_end_declaration", gg.Seq(gg.Str("table_end"), gg.Str("("), gg.Str(")")))
 		for _, rule := range []string{
-			"script_declaration", "label_declaration", "movement_declaration", "include_declaration", "align_declaration", "entries_declaration", "init_header_declaration", "source_include_declaration", "dialect_declaration", "table_end_declaration",
+			"script_declaration", "interaction_declaration", "label_declaration", "movement_declaration", "include_declaration", "align_declaration", "entries_declaration", "init_header_declaration", "source_include_declaration", "dialect_declaration", "table_end_declaration",
 		} {
 			gg.AppendChoice(g, "_top_level_declaration", gg.Sym(rule))
 			gg.AddConflict(g, "_top_level_declaration", rule)
